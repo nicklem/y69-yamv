@@ -14,18 +14,18 @@ document.onreadystatechange = function() {
     "use strict" ;
 
     var $mBrotOptions = ( function() {
-      this.MAX = 255 ,         // max mandelbrot walue after which we conclude function diverges
+      this.MAX   = 255 , // max mandelbrot value after which we conclude function diverges
       this.WHITE = 255 ,
-      this.ZOOM_FACTOR = 1.5 ; // zoom factor upon click
+      this.ZOOM  = 1.5 ; // zoom factor upon click
+      this.ITER  = 30  ;
+      //this.AA    = false ;
       return this ;
     }.bind( {} ) () ) ;
 
     var $mBrot = ( function $mBrot() {
 
-      // SETTINGS
-
       // UTILITY VARS
-
+      //
       var canvas = document.querySelector( "canvas" ) ;
       var ctx = canvas.getContext( "2d" ) ;
       var pixel = ctx.createImageData(1,1);
@@ -34,7 +34,6 @@ document.onreadystatechange = function() {
       // INIT PRIVATE VARS
 
       var zoom = 1 ;
-      var numIter = 30 ;
       var xCenter = yCenter = 0 ;
       // TODO: remove magic constants. These are good starting values to envelop fractal
       var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
@@ -42,10 +41,13 @@ document.onreadystatechange = function() {
       yCoordArr = [] ;
       var xRes , yRes , xCanvasCenter , yCanvasCenter , screenRatio ;
 
+      // VIEW
+
+      var colors = [] ;
+
       // INIT
 
       this.initCanvas = function() {
-
         var initHeight = function() { var idealX = ( yMax - yMin ) * ( xRes / yRes ) ; xMin = -3/5 * idealX ; xMax = 2/5 * idealX ; }
         var initWidth = function() { var idealY = ( yMax - yMin ) * ( yRes / xRes ) ; yMin = - idealY / 2 ; yMax = idealY / 2 ; }
 
@@ -60,12 +62,6 @@ document.onreadystatechange = function() {
 
         return this ;
       } ;
-
-      // VIEW
-      var colors = [] ;
-
-      // TODO: create save() function
-      //xMin = -0.4899598471158813 ; yMin = -0.6323218318998093 ; xMax = -0.47625789755275433 ; yMax = -0.6186198823366823 ;
 
       // UTILITY FUNCTIONS
 
@@ -86,105 +82,153 @@ document.onreadystatechange = function() {
 
       this.mandelDot = function mandelDot( x , y ) {
         var z = [ 0 , 0 ] , modZ = 0 , c = [ x , y ] ;
-        for( var i = 1 ; i <= numIter ; i ++ ) {
+        for( var i = 1 ; i <= $mBrotOptions.ITER ; i ++ ) {
           z = this.complexSum( this.complexMult( z , z ) , c ) ;
           modZ = this.modulus( z ) ;
           if( modZ > $mBrotOptions.MAX ) return colors[ i ] ;
         }
-        return colors[ numIter ] ;
+        return colors[ $mBrotOptions.ITER ] ;
       } ;
 
       this.pixRender = function pixRender( pixRGB , xCanvasCoord , yCanvasCoord ) {
-        pData[0] = pData[1] = pData[2] = pixRGB ;
-        pData[3] = 255 ;
+        pData[0] = pData[1] = pData[2] = pixRGB ; pData[3] = 255 ;
         ctx.putImageData( pixel, xCanvasCoord , yCanvasCoord ); 
       } ;
 
       this.updateColorArr = function() {
         colors = [] ;
-        for( var col = numIter ; col >= 0 ; col-- ) {
-          //for( var col = 0 ; col <= numIter ; col++ ) {
+        for( var col = $mBrotOptions.ITER ; col >= 0 ; col-- ) {
           colors.push( $mBrotOptions.WHITE / Math.exp( col / 10 ) ) ;
-          //colors.push( WHITE / Math.exp( col * ( zoom / 10 ) ) ) ;
         }
-        } ;
+      } ;
 
-        this.populateCoordArrays = function populateCoordArrays() {
-          var deltaX = ( xMax - xMin ) / xRes ,
-          deltaY = ( yMax - yMin ) / yRes ;
-          for( var i = 0 ; i <= xRes ; i ++ ) {
-            xCoordArr[i] = xMin + ( deltaX * i ) ;
-          }
-          for( var i = 0 ; i <= yRes ; i ++ ) {
-            yCoordArr[i] = yMin + ( deltaY * i ) ;
-          }
-          return this;
-        } ;
+      this.populateCoordArrays = function populateCoordArrays() {
+        var deltaX = ( xMax - xMin ) / xRes ,
+        deltaY = ( yMax - yMin ) / yRes ;
+        for( var i = 0 ; i <= xRes ; i ++ ) {
+          xCoordArr[i] = xMin + ( deltaX * i ) ;
+        }
+        for( var i = 0 ; i <= yRes ; i ++ ) {
+          yCoordArr[i] = yMin + ( deltaY * i ) ;
+        }
+        return this;
+      } ;
 
-        this.updateConditions = function updateConditions() {
-
-          zoom *= $mBrotOptions.ZOOM_FACTOR ;
-          numIter += 2 ;
-          this.updateColorArr() ;
-          xCenter = ( ( xCanvasCenter / xRes ) * ( xMax - xMin ) ) + xMin ;
-          yCenter = ( ( yCanvasCenter / yRes ) * ( yMax - yMin ) ) + yMin ;
-
-          xMin = xCenter - screenRatio * ( 2 / zoom ) ;
-          xMax = xCenter + screenRatio * ( 2 / zoom ) ;
-          yMin = yCenter - ( 2 / zoom ) ;
-          yMax = yCenter + ( 2 / zoom ) ;
-
-          return this ;
-        } ;
-
-        this.render = function render() {
-          this.populateCoordArrays() ;
-
-          var that = this ;
-          yCoordArr.forEach( function( yCoord , yCanvasCoord ) { 
-            xCoordArr.forEach( function( xCoord , xCanvasCoord ) { 
-              that.pixRender( that.mandelDot( xCoord , yCoord ) , xCanvasCoord , yCanvasCoord ) ;
-            } ) ;
-          } ) ;
-        } ;
-
-        this.init = function init() {
-          this.updateColorArr() ;
-          this.render() ;
-          return this ;
-        } ;
-
-        this.listen = function listen() {
-          var that = this ;
-          canvas.addEventListener( 'click' , function( ev ) {
-            xCanvasCenter = ev.layerX - canvas.offsetLeft ;
-            yCanvasCenter = ev.layerY - canvas.offsetTop ;
-            that.updateConditions().render() ;
-          } ) ;
-          return this ;
-        } ;
-
+      this.updateColors = function updateColors() {
+        this.updateColorArr() ;
         return this ;
+      } ;
 
-      }.bind({}) () ) ;
+      this.updatePosition = function updatePosition( ev ) {
+        xCanvasCenter = ev.layerX - canvas.offsetLeft ;
+        yCanvasCenter = ev.layerY - canvas.offsetTop ;
+        zoom *= $mBrotOptions.ZOOM ;
+        $mBrotOptions.ITER += 2 ;
+        xCenter = ( ( xCanvasCenter / xRes ) * ( xMax - xMin ) ) + xMin ;
+        yCenter = ( ( yCanvasCenter / yRes ) * ( yMax - yMin ) ) + yMin ;
+        xMin = xCenter - screenRatio * ( 2 / zoom ) ;
+        xMax = xCenter + screenRatio * ( 2 / zoom ) ;
+        yMin = yCenter - ( 2 / zoom ) ;
+        yMax = yCenter + ( 2 / zoom ) ;
+        return this ; 
+      } ;
 
-      var $mBrotControls = ( function() {
-        // private
-        var form = document.querySelector( "#ctrl" ) ;
-        // public
-        this.init = function() {
-          form.addEventListener( "submit" , function( ev ) {
-            ev.preventDefault() ;
-            var invertColors = this.elements[ "invert-colors" ].checked ;
-            $mBrot.initCanvas().init().listen() ;
-            console.log( invertColors ) ;
+      this.draw = function draw() {
+        this.populateCoordArrays() ;
+        var that = this ;
+        yCoordArr.forEach( function( yCoord , yCanvasCoord ) { 
+          xCoordArr.forEach( function( xCoord , xCanvasCoord ) { 
+            that.pixRender( that.mandelDot( xCoord , yCoord ) , xCanvasCoord , yCanvasCoord ) ;
           } ) ;
-        } ;
+        } ) ;
+      } ;
+
+      this.render = function render() {
+        this.updateColors().draw() ;
+      } ;
+
+      this.init = function init() {
+        this.updateColorArr() ;
+        this.draw() ;
         return this ;
-      }.bind({}) () ) ; 
+      } ;
 
-      // Let's Roll!
-      $mBrotControls.init() ;
+      this.listen = function listen() {
+        var that = this ;
+        canvas.addEventListener( 'click' , function( ev ) {
+          that.updatePosition( ev ).render() ;
+          $mBrotControls.render() ;
+        } ) ;
+        return this ;
+      } ;
 
-    }
+      return this ;
+
+    }.bind({}) () ) ;
+
+    var $mBrotControls = ( function() {
+
+      // private
+      var form = document.querySelector( "#ctrl" ) ;
+      var optionDisplay = document.querySelector( "#option-display" ) ;
+      var controls = [] ;
+
+      // public
+      this.init = function() {
+        this.render() ;
+        return this ;
+      } ;
+
+      this.createControls = function() {
+        // TODO improve this
+        controls = [] ;
+        for( var opt in $mBrotOptions ) {
+          var n = document.createElement( "span" ) ;
+          n.id = opt ;
+          var txt = document.createTextNode( opt ) ;
+          var i = document.createElement( "input" ) ;
+          i.type = "text" ;
+          i.name = opt ;
+          i.value = $mBrotOptions[ opt ] ;
+          i.size = 4 ;
+          //n.innerHTML = "" ;
+          n.appendChild( txt ) ;
+          n.appendChild( document.createElement( "br" ) ) ;
+          n.appendChild( i ) ;
+          n.appendChild( document.createElement( "br" ) ) ;
+          controls.push( n ) ;
+        }
+        return this ;
+      }
+
+      this.listen = function() {
+        form.addEventListener( "submit" , function( ev ) {
+          ev.preventDefault() ;
+          for( var opt in $mBrotOptions ) {
+            if( form.hasOwnProperty( opt ) ) {
+              $mBrotOptions[ opt ] = parseFloat( form.elements[ opt ].value ) ;
+            }
+          }
+          $mBrot.render() ;
+        } ) ;
+        return this ;
+      } ;
+
+      this.render = function() {
+        //TODO improve this
+        this.createControls() ;
+        optionDisplay.innerHTML = "" ;
+        controls.forEach( function( el ) {
+          optionDisplay.appendChild( el ) ;
+        } ) ; 
+        return this;
+      } ;
+
+      return this ;
+
+    }.bind({}) () ) ; 
+
+    $mBrot.initCanvas().init().listen() ;
+    $mBrotControls.init().listen() ;
   }
+}
