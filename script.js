@@ -14,10 +14,11 @@ document.onreadystatechange = function() {
     "use strict" ;
 
     var $mBrotOptions = ( function() {
-      this.MAX   = 255 , // max mandelbrot value after which we conclude function diverges
-      this.WHITE = 255 ,
-      this.ZOOM  = 1.5 ; // zoom factor upon click
-      this.ITER  = 30  ;
+      this.MAX      = 2 , // max mandelbrot value after which we conclude function diverges
+      this.MAX_SQ   = this.MAX * this.MAX , // max mandelbrot value after which we conclude function diverges
+      this.WHITE    = 255 ,
+      this.ZOOM     = 1.5 ; // zoom factor upon click
+      this.ITER     = 30  ;
       //this.AA    = false ;
       return this ;
     }.bind( {} ) () ) ;
@@ -27,9 +28,7 @@ document.onreadystatechange = function() {
       // UTILITY VARS
       //
       var canvas = document.querySelector( "canvas" ) ;
-      var ctx = canvas.getContext( "2d" ) ;
-      var pixel = ctx.createImageData(1,1);
-      var pData = pixel.data;
+      var ctx , pData ;
 
       // INIT PRIVATE VARS
 
@@ -39,7 +38,8 @@ document.onreadystatechange = function() {
       var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
       var xCoordArr = [] ,
       yCoordArr = [] ;
-      var xRes , yRes , xCanvasCenter , yCanvasCenter , screenRatio ;
+      var xRes , yRes , xCanvasCenter , yCanvasCenter , screenRatio , windowWidth , windowHeight ;
+        windowHeight = window.innerHeight || 300 ;
 
       // VIEW
 
@@ -51,14 +51,17 @@ document.onreadystatechange = function() {
         var initHeight = function() { var idealX = ( yMax - yMin ) * ( xRes / yRes ) ; xMin = -3/5 * idealX ; xMax = 2/5 * idealX ; }
         var initWidth = function() { var idealY = ( yMax - yMin ) * ( yRes / xRes ) ; yMin = - idealY / 2 ; yMax = idealY / 2 ; }
 
-        var vWidth = window.innerWidth || 300 ;
-        var vHeight = window.innerHeight || 300 ;
+        windowWidth = window.innerWidth || 300 ;
+        windowHeight = window.innerHeight || 300 ;
 
-        canvas.width = xRes = vWidth ;
-        canvas.height = yRes = vHeight ;
-        screenRatio = vWidth / vHeight ;
+        canvas.width = xRes = windowWidth ;
+        canvas.height = yRes = windowHeight ;
+        screenRatio = windowWidth / windowHeight ;
 
-        ( vWidth > vHeight ? initHeight : initWidth )() ;
+        ( windowWidth > windowHeight ? initHeight : initWidth )() ;
+
+        ctx = canvas.getContext( "2d" ) ;
+        pData = ctx.getImageData( 0 , 0 , canvas.width , canvas.height ) ;
 
         return this ;
       } ;
@@ -75,24 +78,24 @@ document.onreadystatechange = function() {
         return [ ( a + c ) , ( b + d ) ] ;
       } ;
 
-      this.modulus = function modulus( c1 ) {
+      this.modulusSquared = function modulus( c1 ) {
         var a = c1[ 0 ] , b = c1[ 1 ] ;
-        return Math.sqrt( a*a + b*b ) ;
+        return a*a + b*b ;
       } ;
 
       this.mandelDot = function mandelDot( x , y ) {
-        var z = [ 0 , 0 ] , modZ = 0 , c = [ x , y ] ;
+        var z = [ 0 , 0 ] , modZSq = 0 , c = [ x , y ] ;
         for( var i = 1 ; i <= $mBrotOptions.ITER ; i ++ ) {
           z = this.complexSum( this.complexMult( z , z ) , c ) ;
-          modZ = this.modulus( z ) ;
-          if( modZ > $mBrotOptions.MAX ) return colors[ i ] ;
+          modZSq = this.modulusSquared( z ) ;
+          if( modZSq > $mBrotOptions.MAX_SQ ) return colors[ i ] ;
         }
         return colors[ $mBrotOptions.ITER ] ;
       } ;
 
       this.pixRender = function pixRender( pixRGB , xCanvasCoord , yCanvasCoord ) {
-        pData[0] = pData[1] = pData[2] = pixRGB ; pData[3] = 255 ;
-        ctx.putImageData( pixel, xCanvasCoord , yCanvasCoord ); 
+        var pixOffset = ( xCanvasCoord + yCanvasCoord * windowWidth ) * 4 ;
+        pData.data[ pixOffset ] = pData.data[ pixOffset + 1 ] = pData.data[ pixOffset + 2 ] = pixRGB ; pData.data[ pixOffset + 3 ] = 255 ;
       } ;
 
       this.updateColorArr = function() {
@@ -141,6 +144,8 @@ document.onreadystatechange = function() {
             that.pixRender( that.mandelDot( xCoord , yCoord ) , xCanvasCoord , yCanvasCoord ) ;
           } ) ;
         } ) ;
+        console.log( pData ) ;
+        ctx.putImageData( pData, 0 , 0 ); 
       } ;
 
       this.render = function render() {
