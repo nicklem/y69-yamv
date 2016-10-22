@@ -9,8 +9,9 @@
  */
 
 //  TODO:
-//  1d color picker
+//  OK - 1d color picker
 //  1d display coord bounds and save coord history vector
+//  1d don't re-calculate unless bounds change
 // .5d image export
 //  2d mobile styles
 //     publish!
@@ -21,12 +22,82 @@ document.onreadystatechange = function() {
 
     "use strict" ;
 
+    var colors = {
+      "white"   : [ 255 , 255 , 255 ] ,
+      "black"   : [   0 ,   0 ,   0 ] ,
+      "red"     : [ 255 ,   0 ,   0 ] ,
+      "green"   : [   0 , 255 ,   0 ] ,
+      "blue"    : [   0 ,   0 , 255 ] ,
+      "cyan"    : [   0 , 255 , 255 ] ,
+      "magenta" : [ 255 ,   0 , 255 ] ,
+      "yellow"  : [ 255 , 255 ,   0 ] ,
+    }
+
     var $mBrotOptions = ( function() {
-      this.MAX         =   2 ,   // max mandelbrot value after which we conclude function diverges
-      this.WHITE       = 255 ,
-      this.ZOOM        =   3 ;   // zoom factor upon click
-      this.ITER        =  25 ;   // initial iter value
-      this.OUT_DIM_FAC =  10 ;
+      this.max = {          // max mandelbrot value after which we conclude function diverges
+        "value" : 2 ,
+        "label" : "Max" ,
+        "type"  : "text" ,
+        //"min" : 0 ,
+        //"max" : 2 ,
+        //"step"  : 0.05 ,
+      } ,
+      this.brightness = {        // overall brightness value
+        "value" : 1 ,
+        "label" : "Brightness Multi" ,
+        "type"  : "text" ,
+        //"min" : 0 ,
+        //"max" : 255 ,
+        //"step"  : 10 ,
+      } ,
+      this.zoom = {
+        "value" : 3 ,
+        "label" : "Zoom on click" ,
+        "type"  : "text" ,
+        //"min" : 0.1 ,
+        //"max" : 10 ,
+        //"step"  : 0.1 ,
+      } ,
+      this.iter =  {        // initial iter value
+        "value" : 25 ,
+        "label" : "Iterations" ,
+        "type"  : "text" ,
+        //"min" : 0 ,
+        //"max" : 150 ,
+        //"step"  : 3 ,
+      } ,
+      this.outBright = {
+        "value" : 10 ,
+        "label" : "Outer brightness" ,
+        "type"  : "text" ,
+        //"min" : 0 ,
+        //"max" : 100 ,
+        //"step"  : 5 ,
+      } ;
+      this.innerColor = {
+        "value" : "white" ,
+        "label" : "Inner color" ,
+        "type"  : "select" ,
+        "options": colors ,
+        //"min" : 0 ,
+        //"max" : 100 ,
+      } ;
+      this.midColor = {
+        "value" : "red" ,
+        "label" : "Middle color" ,
+        "type"  : "select" ,
+        "options": colors ,
+        //"min" : 0 ,
+        //"max" : 100 ,
+      } ;
+      this.outerColor = {
+        "value" : "black" ,
+        "label" : "Outer color" ,
+        "type"  : "select" ,
+        "options": colors ,
+        //"min" : 0 ,
+        //"max" : 100 ,
+      } ;
       //this.AA    = false ;
       return this ;
     }.bind( {} ) () ) ;
@@ -54,7 +125,7 @@ document.onreadystatechange = function() {
       // INIT PRIVATE VARS
 
       var zoom = 1 ;
-      var maxSq = $mBrotOptions.MAX * $mBrotOptions.MAX ; // squared for efficiency
+      var maxSq = $mBrotOptions.max.value * $mBrotOptions.max.value ; // squared for efficiency
       var xCenter = yCenter = 0 ;
       // TODO: remove magic constants. These are good starting values to envelop fractal
       var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
@@ -108,12 +179,12 @@ document.onreadystatechange = function() {
 
       this.mandelDot = function mandelDot( x , y ) {
         var z = [ 0 , 0 ] , modZSq = 0 , c = [ x , y ] ;
-        for( var i = 1 ; i <= $mBrotOptions.ITER ; i ++ ) {
+        for( var i = 1 ; i <= $mBrotOptions.iter.value ; i ++ ) {
           z = this.complexSum( this.complexMult( z , z ) , c ) ;
           modZSq = this.modulusSquared( z ) ;
           if( modZSq > maxSq ) return intensityRGB[ i ] ;
         }
-        return intensityRGB[ $mBrotOptions.ITER ] ;
+        return intensityRGB[ $mBrotOptions.iter.value ] ;
       } ;
 
       //this.pixRender = function pixRender( pixRGB , xCanvasCoord , yCanvasCoord ) {
@@ -131,23 +202,22 @@ document.onreadystatechange = function() {
         intensityRGB = [] ;
         colorRGB = [] ;
 
-        var init = [ 255 , 255 , 255 ] ; // static init set to red    corresponds to Bezier P0
-        var mid  = [   0 , 255 ,   0 ] ; // static mid set to green   corresponds to Bezier P1
-        var end  = [   0 ,   0 , 255 ] ; // static mid set to blue    corresponds to Bezier P2
+        var innerColor = colors[ $mBrotOptions.innerColor.value ] ;
+        var midColor   = colors[ $mBrotOptions.midColor.value ] ;
+        var outerColor = colors[ $mBrotOptions.outerColor.value ] ;
 
-        for( var col = $mBrotOptions.ITER ; col >= 0 ; col-- ) {
-          var curIntensity = $mBrotOptions.WHITE / Math.exp( col / $mBrotOptions.OUT_DIM_FAC ) ;
-          var outerDimmingFactor = curIntensity / $mBrotOptions.WHITE ;
-          //var outerDimmingFactor = 1 ;
-          intensityRGB.push( curIntensity ) ;
-          var bezierFactor = col / $mBrotOptions.ITER ;
+        for( var col = $mBrotOptions.iter.value ; col >= 0 ; col-- ) {
+          var outerBrightnessFactor = 1 / Math.exp( col / $mBrotOptions.outBright.value ) ;
+          var bezierFactor = col / $mBrotOptions.iter.value ;
+          var brightMulti = outerBrightnessFactor * $mBrotOptions.brightness.value ;
+          intensityRGB.push( outerBrightnessFactor ) ;
           colorRGB.push( [
-              this.bezierInterpolate( init[ R ] , mid[ R ] , end[ R ] , bezierFactor ) * outerDimmingFactor ,
-              this.bezierInterpolate( init[ G ] , mid[ G ] , end[ G ] , bezierFactor ) * outerDimmingFactor ,
-              this.bezierInterpolate( init[ B ] , mid[ B ] , end[ B ] , bezierFactor ) * outerDimmingFactor
+              this.bezierInterpolate( innerColor[ R ] , midColor[ R ] , outerColor[ R ] , bezierFactor ) * brightMulti ,
+              this.bezierInterpolate( innerColor[ G ] , midColor[ G ] , outerColor[ G ] , bezierFactor ) * brightMulti ,
+              this.bezierInterpolate( innerColor[ B ] , midColor[ B ] , outerColor[ B ] , bezierFactor ) * brightMulti
           ] ) ;
         }
-        console.log( colorRGB ) ;
+        //console.log( colorRGB ) ;
         return this ;
       } ;
 
@@ -170,11 +240,12 @@ document.onreadystatechange = function() {
 
       this.updateParams = function updateParams( ev ) {
 
-        zoom *= $mBrotOptions.ZOOM ;
-        maxSq = $mBrotOptions.MAX * $mBrotOptions.MAX ;
-        $mBrotOptions.ITER += 2 ;
+        maxSq = $mBrotOptions.max.value * $mBrotOptions.max.value ;
+        $mBrotOptions.iter.value += 2 ;
 
         if( !! ev ) { // onClick update, as opposed to form submit update
+          // update zoom factor
+          zoom *= $mBrotOptions.zoom.value ;
           // update center
           xCanvasCenter = ev.layerX - canvas.offsetLeft ;
           yCanvasCenter = ev.layerY - canvas.offsetTop ;
@@ -203,7 +274,7 @@ document.onreadystatechange = function() {
               var curColorRGB = [] ;
               var z = [ 0 , 0 ] , modZSq = 0 , c = [ xCoordArr[ xCoord ] , yCoordArr[ yCoord ] ] ;
 
-              for( var i = 1 ; i <= $mBrotOptions.ITER ; i ++ ) {
+              for( var i = 1 ; i <= $mBrotOptions.iter.value ; i ++ ) {
                 z = this.complexSum( this.complexMult( z , z ) , c ) ;
                 modZSq = this.modulusSquared( z ) ;
                 if( modZSq > maxSq ) {
@@ -212,18 +283,15 @@ document.onreadystatechange = function() {
                   break;
                 }
               }
-              if( i > $mBrotOptions.ITER ) {
-                curIntensityRGB = intensityRGB[ $mBrotOptions.ITER ] ;
-                curColorRGB = colorRGB[ $mBrotOptions.ITER ] ;
+              if( i > $mBrotOptions.iter.value ) {
+                curIntensityRGB = intensityRGB[ $mBrotOptions.iter.value ] ;
+                curColorRGB = colorRGB[ $mBrotOptions.iter.value ] ;
               }
 
-              //imgData.data[ pixOffset ] = imgData.data[ pixOffset + 1 ] = imgData.data[ pixOffset + 2 ] = curIntensityRGB ;
               imgData.data[ pixOffset ]     = curColorRGB[ R ] ;
               imgData.data[ pixOffset + 1 ] = curColorRGB[ G ] ;
               imgData.data[ pixOffset + 2 ] = curColorRGB[ B ] ;
-                //= this.mandelDot( xCoordArr[ xCoord ] , yCoordArr[ yCoord ] );
-              imgData.data[ pixOffset + 3 ] = 255 ;
-              //this.pixRender( this.mandelDot( xCoordArr[ xCoord ] , yCoordArr[ yCoord ] ) , xCoord , yCoord  ) ;
+              imgData.data[ pixOffset + 3 ] = 255 ; // alpha
           }
         }
 
@@ -246,7 +314,7 @@ document.onreadystatechange = function() {
       } ;
 
       this.listen = function listen() {
-        canvas.addEventListener( 'click' , function( ev ) {
+        canvas.addEventListener( "click" , function( ev ) {
           $mBrotControls.mapControls() ;
           this.updateParams( ev ) ;
           this.render() ;
@@ -276,19 +344,37 @@ document.onreadystatechange = function() {
         // TODO improve this
         controls = [] ;
         for( var opt in $mBrotOptions ) {
-          var n = document.createElement( "span" ) ;
-          n.id = opt ;
-          var txt = document.createTextNode( opt ) ;
-          var i = document.createElement( "input" ) ;
-          i.type = "text" ;
-          i.name = opt ;
-          i.value = $mBrotOptions[ opt ] ;
-          i.size = 4 ;
-          n.appendChild( txt ) ;
-          n.appendChild( document.createElement( "br" ) ) ;
-          n.appendChild( i ) ;
-          n.appendChild( document.createElement( "br" ) ) ;
-          controls.push( n ) ;
+          // init container
+          var container = document.createElement( "span" ) ;
+          container.id = opt ;
+          var txt = document.createTextNode( $mBrotOptions[ opt ].label ) ;
+          // switch to create inputElement based on options format
+          switch( $mBrotOptions[ opt ].type ) {
+            case( "text" ) :
+              var inputElement = document.createElement( "input" ) ;
+              inputElement.setAttribute( "type" , $mBrotOptions[ opt ].type ) ;
+              inputElement.name = opt ;
+              inputElement.value = $mBrotOptions[ opt ].value ;
+              break ;
+            case( "select" ) :
+              var options = $mBrotOptions[ opt ].options ;
+              var curOption = $mBrotOptions[ opt ].value ;
+              var inputElement = document.createElement( "select" ) ;
+              inputElement.name = opt ;
+              for( var o in options ) {
+                var curOpt = document.createElement( "option" ) ;
+                curOpt.setAttribute( "value" , o ) ;
+                if( o === curOption ) curOpt.setAttribute( "selected" , "" ) ;
+                curOpt.innerHTML = o ;
+                inputElement.appendChild( curOpt ) ;
+              }
+          }
+          // append label & formatted inner container
+          container.appendChild( txt ) ;
+          container.appendChild( document.createElement( "br" ) ) ;
+          container.appendChild( inputElement ) ;
+          container.appendChild( document.createElement( "br" ) ) ;
+          controls.push( container ) ;
         }
         return this ;
       } ;
@@ -296,7 +382,9 @@ document.onreadystatechange = function() {
       this.mapControls = function() {
           for( var opt in $mBrotOptions ) {
             if( form.hasOwnProperty( opt ) ) {
-              $mBrotOptions[ opt ] = parseFloat( form.elements[ opt ].value ) ;
+              // TODO: clean up input type detection
+              var curOpt = form.elements[ opt ].value ;
+              $mBrotOptions[ opt ].value = isNaN( parseFloat( curOpt ) ) ? curOpt : parseFloat( curOpt ) ;
             }
           }
           return this ;
@@ -304,9 +392,11 @@ document.onreadystatechange = function() {
 
       this.listen = function() {
         form.addEventListener( "submit" , function( ev ) {
+        //form.addEventListener( "mouseup" , function( ev ) {
           ev.preventDefault() ;
           this.mapControls() ;
           $mBrot.updateParams().render() ;
+          //console.log( $mBrotOptions.brightness.value ) ;
         }.bind( this ) ) ;
         return this ;
       } ;
