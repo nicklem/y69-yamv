@@ -15,7 +15,6 @@ document.onreadystatechange = function() {
 
     var $mBrotOptions = ( function() {
       this.MAX      = 2 , // max mandelbrot value after which we conclude function diverges
-      this.MAX_SQ   = this.MAX * this.MAX , // max mandelbrot value after which we conclude function diverges
       this.WHITE    = 255 ,
       this.ZOOM     = 1.5 ; // zoom factor upon click
       this.ITER     = 30  ;
@@ -33,6 +32,7 @@ document.onreadystatechange = function() {
       // INIT PRIVATE VARS
 
       var zoom = 1 ;
+      var maxSq = $mBrotOptions.MAX * $mBrotOptions.MAX ; // max mandelbrot value after which we conclude function diverges
       var xCenter = yCenter = 0 ;
       // TODO: remove magic constants. These are good starting values to envelop fractal
       var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
@@ -88,15 +88,16 @@ document.onreadystatechange = function() {
         for( var i = 1 ; i <= $mBrotOptions.ITER ; i ++ ) {
           z = this.complexSum( this.complexMult( z , z ) , c ) ;
           modZSq = this.modulusSquared( z ) ;
-          if( modZSq > $mBrotOptions.MAX_SQ ) return colors[ i ] ;
+          if( modZSq > maxSq ) return colors[ i ] ;
         }
         return colors[ $mBrotOptions.ITER ] ;
       } ;
 
-      this.pixRender = function pixRender( pixRGB , xCanvasCoord , yCanvasCoord ) {
-        var pixOffset = ( xCanvasCoord + yCanvasCoord * windowWidth ) * 4 ;
-        pData.data[ pixOffset ] = pData.data[ pixOffset + 1 ] = pData.data[ pixOffset + 2 ] = pixRGB ; pData.data[ pixOffset + 3 ] = 255 ;
-      } ;
+      //this.pixRender = function pixRender( pixRGB , xCanvasCoord , yCanvasCoord ) {
+      //var pixOffset = ( xCanvasCoord + yCanvasCoord * windowWidth ) * 4 ;
+      //pData.data[ pixOffset ] = pData.data[ pixOffset + 1 ] = pData.data[ pixOffset + 2 ] = pixRGB ; pData.data[ pixOffset + 3 ] = 255 ;
+      //} ;
+
 
       this.updateColorArr = function() {
         colors = [] ;
@@ -122,29 +123,58 @@ document.onreadystatechange = function() {
         return this ;
       } ;
 
-      this.updatePosition = function updatePosition( ev ) {
-        xCanvasCenter = ev.layerX - canvas.offsetLeft ;
-        yCanvasCenter = ev.layerY - canvas.offsetTop ;
+      this.updateParams = function updateParams( ev ) {
+
         zoom *= $mBrotOptions.ZOOM ;
+        maxSq = $mBrotOptions.MAX * $mBrotOptions.MAX ;
+        console.log( maxSq ) ;
         $mBrotOptions.ITER += 2 ;
-        xCenter = ( ( xCanvasCenter / xRes ) * ( xMax - xMin ) ) + xMin ;
-        yCenter = ( ( yCanvasCenter / yRes ) * ( yMax - yMin ) ) + yMin ;
-        xMin = xCenter - screenRatio * ( 2 / zoom ) ;
-        xMax = xCenter + screenRatio * ( 2 / zoom ) ;
-        yMin = yCenter - ( 2 / zoom ) ;
-        yMax = yCenter + ( 2 / zoom ) ;
+
+        if( ev ) {
+          console.log( ev ) ;
+          xCanvasCenter = ev.layerX - canvas.offsetLeft ;
+          yCanvasCenter = ev.layerY - canvas.offsetTop ;
+          xCenter = ( ( xCanvasCenter / xRes ) * ( xMax - xMin ) ) + xMin ;
+          yCenter = ( ( yCanvasCenter / yRes ) * ( yMax - yMin ) ) + yMin ;
+          xMin = xCenter - screenRatio * ( 2 / zoom ) ;
+          xMax = xCenter + screenRatio * ( 2 / zoom ) ;
+          yMin = yCenter - ( 2 / zoom ) ;
+          yMax = yCenter + ( 2 / zoom ) ;
+        }
         return this ; 
       } ;
 
       this.draw = function draw() {
         this.populateCoordArrays() ;
-        var that = this ;
-        yCoordArr.forEach( function( yCoord , yCanvasCoord ) { 
-          xCoordArr.forEach( function( xCoord , xCanvasCoord ) { 
-            that.pixRender( that.mandelDot( xCoord , yCoord ) , xCanvasCoord , yCanvasCoord ) ;
-          } ) ;
-        } ) ;
-        console.log( pData ) ;
+        var yCoord = xCoord = 0 ;
+        var lenY = yCoordArr.length ;
+        var lenX = xCoordArr.length ;
+
+        for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
+          for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
+
+              var pixOffset = ( xCoord + yCoord * windowWidth ) * 4 ;
+              var mRGB = 0 ;
+              var z = [ 0 , 0 ] , modZSq = 0 , c = [ xCoordArr[ xCoord ] , yCoordArr[ yCoord ] ] ;
+
+              for( var i = 1 ; i <= $mBrotOptions.ITER ; i ++ ) {
+                z = this.complexSum( this.complexMult( z , z ) , c ) ;
+                modZSq = this.modulusSquared( z ) ;
+                if( modZSq > maxSq ) {
+                  mRGB = colors[ i ] ;
+                  break;
+                }
+              }
+              if( i > $mBrotOptions.ITER ) mRGB = colors[ $mBrotOptions.ITER ] ;
+
+              pData.data[ pixOffset ] = pData.data[ pixOffset + 1 ] = pData.data[ pixOffset + 2 ] = mRGB ;
+                //= this.mandelDot( xCoordArr[ xCoord ] , yCoordArr[ yCoord ] );
+              pData.data[ pixOffset + 3 ] = 255 ;
+              //this.pixRender( this.mandelDot( xCoordArr[ xCoord ] , yCoordArr[ yCoord ] ) , xCoord , yCoord  ) ;
+          }
+        }
+
+        //console.log( pData ) ;
         ctx.putImageData( pData, 0 , 0 ); 
       } ;
 
@@ -153,6 +183,7 @@ document.onreadystatechange = function() {
       } ;
 
       this.init = function init() {
+        this.initCanvas() ;
         this.updateColorArr() ;
         this.draw() ;
         return this ;
@@ -161,8 +192,8 @@ document.onreadystatechange = function() {
       this.listen = function listen() {
         var that = this ;
         canvas.addEventListener( 'click' , function( ev ) {
-          that.updatePosition( ev ).render() ;
-          $mBrotControls.render() ;
+          $mBrotControls.mapControls().render() ;
+          that.updateParams( ev ).render() ;
         } ) ;
         return this ;
       } ;
@@ -204,17 +235,23 @@ document.onreadystatechange = function() {
           controls.push( n ) ;
         }
         return this ;
-      }
+      } ;
 
-      this.listen = function() {
-        form.addEventListener( "submit" , function( ev ) {
-          ev.preventDefault() ;
+      this.mapControls = function() {
           for( var opt in $mBrotOptions ) {
             if( form.hasOwnProperty( opt ) ) {
               $mBrotOptions[ opt ] = parseFloat( form.elements[ opt ].value ) ;
             }
           }
-          $mBrot.render() ;
+          return this ;
+      } ;
+
+      this.listen = function() {
+        var that = this ;
+        form.addEventListener( "submit" , function( ev ) {
+          ev.preventDefault() ;
+          that.mapControls() ;
+          $mBrot.updateParams().render() ;
         } ) ;
         return this ;
       } ;
@@ -233,7 +270,13 @@ document.onreadystatechange = function() {
 
     }.bind({}) () ) ; 
 
-    $mBrot.initCanvas().init().listen() ;
-    $mBrotControls.init().listen() ;
+    // Let's Roll!
+    
+    $mBrot
+      .init()
+      .listen() ;
+    $mBrotControls
+      .init()
+      .listen() ;
   }
 }
