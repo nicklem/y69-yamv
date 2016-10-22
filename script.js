@@ -8,17 +8,39 @@
  ************************
  */
 
+//  TODO:
+//  1d color picker
+//  1d display coord bounds and save coord history vector
+// .5d image export
+//  2d mobile styles
+//     publish!
+//  ?d refactor
+
 document.onreadystatechange = function() {
   if( document.readyState == 'interactive' ) {
 
     "use strict" ;
 
     var $mBrotOptions = ( function() {
-      this.MAX      = 2 , // max mandelbrot value after which we conclude function diverges
-      this.WHITE    = 255 ,
-      this.ZOOM     = 1.5 ; // zoom factor upon click
-      this.ITER     = 30  ;
+      this.MAX         =   2 ,   // max mandelbrot value after which we conclude function diverges
+      this.WHITE       = 255 ,
+      this.ZOOM        =   3 ;   // zoom factor upon click
+      this.ITER        =  25 ;   // initial iter value
+      this.OUT_DIM_FAC =  10 ;
       //this.AA    = false ;
+      return this ;
+    }.bind( {} ) () ) ;
+
+    var $mBrotUtil = ( function() {
+      this.performanceExec = function( f , msg ) {
+        var initDraw = performance.now();
+        f() ;
+        var endDraw = performance.now();
+        var t = ( endDraw - initDraw ) ;
+        var millisecondsOrSeconds = t > 1000 ? [ 1 , "s" ] : [ 1000 , "ms" ] ;
+        var ms = Math.round( millisecondsOrSeconds[ 0 ] * t ) / 1000 ;
+        console.log( msg + ": " + ms + " " + millisecondsOrSeconds[ 1 ] + ".") ;
+      } ;
       return this ;
     }.bind( {} ) () ) ;
 
@@ -27,12 +49,12 @@ document.onreadystatechange = function() {
       // UTILITY VARS
       //
       var canvas = document.querySelector( "canvas" ) ;
-      var ctx , pData ;
+      var ctx , imgData ;
 
       // INIT PRIVATE VARS
 
       var zoom = 1 ;
-      var maxSq = $mBrotOptions.MAX * $mBrotOptions.MAX ; // max mandelbrot value after which we conclude function diverges
+      var maxSq = $mBrotOptions.MAX * $mBrotOptions.MAX ; // squared for efficiency
       var xCenter = yCenter = 0 ;
       // TODO: remove magic constants. These are good starting values to envelop fractal
       var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
@@ -43,7 +65,8 @@ document.onreadystatechange = function() {
 
       // VIEW
 
-      var colors = [] ;
+      var intensityRGB = [] , colorRGB = [] ;
+      var R = 0 , G = 1 , B = 2 ;
 
       // INIT
 
@@ -61,7 +84,7 @@ document.onreadystatechange = function() {
         ( windowWidth > windowHeight ? initHeight : initWidth )() ;
 
         ctx = canvas.getContext( "2d" ) ;
-        pData = ctx.getImageData( 0 , 0 , canvas.width , canvas.height ) ;
+        imgData = ctx.getImageData( 0 , 0 , canvas.width , canvas.height ) ;
 
         return this ;
       } ;
@@ -88,22 +111,44 @@ document.onreadystatechange = function() {
         for( var i = 1 ; i <= $mBrotOptions.ITER ; i ++ ) {
           z = this.complexSum( this.complexMult( z , z ) , c ) ;
           modZSq = this.modulusSquared( z ) ;
-          if( modZSq > maxSq ) return colors[ i ] ;
+          if( modZSq > maxSq ) return intensityRGB[ i ] ;
         }
-        return colors[ $mBrotOptions.ITER ] ;
+        return intensityRGB[ $mBrotOptions.ITER ] ;
       } ;
 
       //this.pixRender = function pixRender( pixRGB , xCanvasCoord , yCanvasCoord ) {
       //var pixOffset = ( xCanvasCoord + yCanvasCoord * windowWidth ) * 4 ;
-      //pData.data[ pixOffset ] = pData.data[ pixOffset + 1 ] = pData.data[ pixOffset + 2 ] = pixRGB ; pData.data[ pixOffset + 3 ] = 255 ;
+      //imgData.data[ pixOffset ] = imgData.data[ pixOffset + 1 ] = imgData.data[ pixOffset + 2 ] = pixRGB ; imgData.data[ pixOffset + 3 ] = 255 ;
       //} ;
 
 
+      this.bezierInterpolate = function( P0 , P1 , P2 , t ) {
+        return ( 1 - t ) * ( 1 - t ) * P0 + 2 * (1 - t ) * t * P1 + t * t * P2 ;
+      } ;
+
       this.updateColorArr = function() {
-        colors = [] ;
+
+        intensityRGB = [] ;
+        colorRGB = [] ;
+
+        var init = [ 255 , 255 , 255 ] ; // static init set to red    corresponds to Bezier P0
+        var mid  = [   0 , 255 ,   0 ] ; // static mid set to green   corresponds to Bezier P1
+        var end  = [   0 ,   0 , 255 ] ; // static mid set to blue    corresponds to Bezier P2
+
         for( var col = $mBrotOptions.ITER ; col >= 0 ; col-- ) {
-          colors.push( $mBrotOptions.WHITE / Math.exp( col / 10 ) ) ;
+          var curIntensity = $mBrotOptions.WHITE / Math.exp( col / $mBrotOptions.OUT_DIM_FAC ) ;
+          var outerDimmingFactor = curIntensity / $mBrotOptions.WHITE ;
+          //var outerDimmingFactor = 1 ;
+          intensityRGB.push( curIntensity ) ;
+          var bezierFactor = col / $mBrotOptions.ITER ;
+          colorRGB.push( [
+              this.bezierInterpolate( init[ R ] , mid[ R ] , end[ R ] , bezierFactor ) * outerDimmingFactor ,
+              this.bezierInterpolate( init[ G ] , mid[ G ] , end[ G ] , bezierFactor ) * outerDimmingFactor ,
+              this.bezierInterpolate( init[ B ] , mid[ B ] , end[ B ] , bezierFactor ) * outerDimmingFactor
+          ] ) ;
         }
+        console.log( colorRGB ) ;
+        return this ;
       } ;
 
       this.populateCoordArrays = function populateCoordArrays() {
@@ -127,13 +172,13 @@ document.onreadystatechange = function() {
 
         zoom *= $mBrotOptions.ZOOM ;
         maxSq = $mBrotOptions.MAX * $mBrotOptions.MAX ;
-        console.log( maxSq ) ;
         $mBrotOptions.ITER += 2 ;
 
-        if( ev ) {
-          console.log( ev ) ;
+        if( !! ev ) { // onClick update, as opposed to form submit update
+          // update center
           xCanvasCenter = ev.layerX - canvas.offsetLeft ;
           yCanvasCenter = ev.layerY - canvas.offsetTop ;
+          // remap center to complex plane
           xCenter = ( ( xCanvasCenter / xRes ) * ( xMax - xMin ) ) + xMin ;
           yCenter = ( ( yCanvasCenter / yRes ) * ( yMax - yMin ) ) + yMin ;
           xMin = xCenter - screenRatio * ( 2 / zoom ) ;
@@ -154,47 +199,59 @@ document.onreadystatechange = function() {
           for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
 
               var pixOffset = ( xCoord + yCoord * windowWidth ) * 4 ;
-              var mRGB = 0 ;
+              var curIntensityRGB = 0 ;
+              var curColorRGB = [] ;
               var z = [ 0 , 0 ] , modZSq = 0 , c = [ xCoordArr[ xCoord ] , yCoordArr[ yCoord ] ] ;
 
               for( var i = 1 ; i <= $mBrotOptions.ITER ; i ++ ) {
                 z = this.complexSum( this.complexMult( z , z ) , c ) ;
                 modZSq = this.modulusSquared( z ) ;
                 if( modZSq > maxSq ) {
-                  mRGB = colors[ i ] ;
+                  curIntensityRGB = intensityRGB[ i ] ;
+                  curColorRGB = colorRGB[ i ] ;
                   break;
                 }
               }
-              if( i > $mBrotOptions.ITER ) mRGB = colors[ $mBrotOptions.ITER ] ;
+              if( i > $mBrotOptions.ITER ) {
+                curIntensityRGB = intensityRGB[ $mBrotOptions.ITER ] ;
+                curColorRGB = colorRGB[ $mBrotOptions.ITER ] ;
+              }
 
-              pData.data[ pixOffset ] = pData.data[ pixOffset + 1 ] = pData.data[ pixOffset + 2 ] = mRGB ;
+              //imgData.data[ pixOffset ] = imgData.data[ pixOffset + 1 ] = imgData.data[ pixOffset + 2 ] = curIntensityRGB ;
+              imgData.data[ pixOffset ]     = curColorRGB[ R ] ;
+              imgData.data[ pixOffset + 1 ] = curColorRGB[ G ] ;
+              imgData.data[ pixOffset + 2 ] = curColorRGB[ B ] ;
                 //= this.mandelDot( xCoordArr[ xCoord ] , yCoordArr[ yCoord ] );
-              pData.data[ pixOffset + 3 ] = 255 ;
+              imgData.data[ pixOffset + 3 ] = 255 ;
               //this.pixRender( this.mandelDot( xCoordArr[ xCoord ] , yCoordArr[ yCoord ] ) , xCoord , yCoord  ) ;
           }
         }
 
-        //console.log( pData ) ;
-        ctx.putImageData( pData, 0 , 0 ); 
+        //console.log( imgData ) ;
+        ctx.putImageData( imgData, 0 , 0 ); 
       } ;
 
       this.render = function render() {
-        this.updateColors().draw() ;
+        $mBrotUtil.performanceExec( function() {
+          this.updateColors().draw() ;
+        }.bind( this ) , "$mBrot.render()") ;
+        return this ;
       } ;
 
       this.init = function init() {
-        this.initCanvas() ;
-        this.updateColorArr() ;
-        this.draw() ;
+        $mBrotUtil.performanceExec( function() {
+          this.initCanvas().updateColorArr().draw() ;
+        }.bind( this ) , "$mBrot.init()") ;
         return this ;
       } ;
 
       this.listen = function listen() {
-        var that = this ;
         canvas.addEventListener( 'click' , function( ev ) {
-          $mBrotControls.mapControls().render() ;
-          that.updateParams( ev ).render() ;
-        } ) ;
+          $mBrotControls.mapControls() ;
+          this.updateParams( ev ) ;
+          this.render() ;
+          $mBrotControls.render() ;
+        }.bind( this ) ) ;
         return this ;
       } ;
 
@@ -227,7 +284,6 @@ document.onreadystatechange = function() {
           i.name = opt ;
           i.value = $mBrotOptions[ opt ] ;
           i.size = 4 ;
-          //n.innerHTML = "" ;
           n.appendChild( txt ) ;
           n.appendChild( document.createElement( "br" ) ) ;
           n.appendChild( i ) ;
@@ -247,12 +303,11 @@ document.onreadystatechange = function() {
       } ;
 
       this.listen = function() {
-        var that = this ;
         form.addEventListener( "submit" , function( ev ) {
           ev.preventDefault() ;
-          that.mapControls() ;
+          this.mapControls() ;
           $mBrot.updateParams().render() ;
-        } ) ;
+        }.bind( this ) ) ;
         return this ;
       } ;
 
