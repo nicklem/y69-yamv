@@ -40,59 +40,59 @@ document.onreadystatechange = function() {
         "value" : 2 ,
         "label" : "Max" ,
         "type"  : "text" ,
-        "recalc": true ,
+        "recalc": 1 ,
       } ,
       this.brightness = {        // overall brightness value
         "value" : 1 ,
         "label" : "Brightness Multi" ,
         "type"  : "text" ,
-        "recalc": false ,
+        "recalc": 0 ,
       } ,
       this.zoom = {
         "value" : 3 ,
         "label" : "Zoom on click" ,
         "type"  : "text" ,
-        "recalc": false ,
+        "recalc": 0 ,
       } ,
       this.iter =  {        // initial iter value
         "value" : 25 ,
         "label" : "Iterations" ,
         "type"  : "text" ,
-        "recalc": true ,
+        "recalc": 1 ,
       } ,
       this.outBrightDecay = {
         "value" : 7 ,
         "label" : "Brightness decay" ,
         "type"  : "text" ,
-        "recalc": false ,
+        "recalc": 0 ,
       } ;
       this.innerColor = {
         "value" : "white" ,
         "label" : "Inner color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalc": false ,
+        "recalc": 0 ,
       } ;
       this.rimColor = {
         "value" : "red" ,
         "label" : "Rim color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalc": false ,
+        "recalc": 0 ,
       } ;
       this.haloColor = {
         "value" : "blue" ,
         "label" : "Halo color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalc": false ,
+        "recalc": 0 ,
       } ;
       this.outerColor = {
         "value" : "black" ,
         "label" : "Outer color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalc": false ,
+        "recalc": 0 ,
       } ;
       return this ;
     }.bind( {} ) () ) ;
@@ -328,7 +328,7 @@ document.onreadystatechange = function() {
       var form = document.querySelector( "#ctrl" ) ;
       var optionDisplay = document.querySelector( "#option-display" ) ;
       var controls = [] ;
-      var redrawOnSubmit = false ;
+      var recalcOnSubmit = false ;
 
       // public
       this.init = function() {
@@ -376,11 +376,14 @@ document.onreadystatechange = function() {
 
       this.mapControls = function() {
           for( var opt in $mBrotOptions ) {
-            redrawOnSubmit &= $mBrotOptions[ opt ].redraw ;
+            //console.log( recalcOnSubmit ) ;
             if( form.hasOwnProperty( opt ) ) {
               var curOpt = form.elements[ opt ].value ;
               curOpt = isNaN( parseFloat( curOpt ) ) ? curOpt : parseFloat( curOpt ) ;
-              $mBrotOptions[ opt ].value = curOpt ;
+              if( $mBrotOptions[ opt ].value !== curOpt ) {
+                recalcOnSubmit += $mBrotOptions[ opt ].recalc ;
+                $mBrotOptions[ opt ].value = curOpt ;
+              }
             }
           }
           return this ;
@@ -389,9 +392,10 @@ document.onreadystatechange = function() {
       this.listen = function() {
         form.addEventListener( "submit" , function( ev ) {
           ev.preventDefault() ;
-          redrawOnSubmit = false ;
+          recalcOnSubmit = 0 ;
           this.mapControls() ;
-          if( redrawOnSubmit ) {
+          console.log( recalcOnSubmit ) ;
+          if( recalcOnSubmit !== 0 ) {
             $mBrot.updateParams().render() ;
           } else {
             $mBrot.redraw() ;
