@@ -21,74 +21,74 @@ document.onreadystatechange = function() {
     "use strict" ;
 
     var colors = {
-      "white"    : [ 255 , 255 , 255 ] ,
-      "gray 1"   : [ 127 , 127 , 127 ] ,
-      "gray 2"   : [  63 ,  63 ,  63 ] ,
-      "gray 3"   : [  31 ,  31 ,  31 ] ,
-      "black"    : [   0 ,   0 ,   0 ] ,
-      "red"      : [ 255 ,   0 ,   0 ] ,
-      "green"    : [   0 , 255 ,   0 ] ,
-      "blue"     : [   0 ,   0 , 255 ] ,
-      "cyan"     : [   0 , 255 , 255 ] ,
-      "magenta"  : [ 255 ,   0 , 255 ] ,
-      "yellow"   : [ 255 , 255 ,   0 ] ,
+      "White"    : [ 255 , 255 , 255 ] ,
+      "Gray 1"   : [ 127 , 127 , 127 ] ,
+      "Gray 2"   : [  63 ,  63 ,  63 ] ,
+      "Gray 3"   : [  31 ,  31 ,  31 ] ,
+      "Black"    : [   0 ,   0 ,   0 ] ,
+      "Red"      : [ 255 ,   0 ,   0 ] ,
+      "Green"    : [   0 , 255 ,   0 ] ,
+      "Blue"     : [   0 ,   0 , 255 ] ,
+      "Cyan"     : [   0 , 255 , 255 ] ,
+      "Magenta"  : [ 255 ,   0 , 255 ] ,
+      "Yellow"   : [ 255 , 255 ,   0 ] ,
      } ;
 
     var $mBrotOptions = ( function() {
       this.max = {          // max mandelbrot value after which we conclude function diverges
         "value" : 2 ,
-        "label" : "Max" ,
+        "labelText" : "Max" ,
         "type"  : "text" ,
         "recalcNeeded": 1 ,
       } ,
       this.iter =  {        // initial iter value
         "value" : 25 ,
-        "label" : "Iterations" ,
+        "labelText" : "Iterations" ,
         "type"  : "text" ,
         "recalcNeeded": 1 ,
       } ,
       this.zoom = {
         "value" : 3 ,
-        "label" : "Zoom on click" ,
+        "labelText" : "Zoom factor" ,
         "type"  : "text" ,
         "recalcNeeded": 0 ,
       } ,
       this.brightness = {        // overall brightness value
         "value" : 1 ,
-        "label" : "Brightness Multi" ,
+        "labelText" : "Brightness" ,
         "type"  : "text" ,
         "recalcNeeded": 0 ,
       } ,
-      this.outBrightDecay = {
+      this.haloDecay = {
         "value" : 7 ,
-        "label" : "Brightness decay" ,
+        "labelText" : "Halo decay" ,
         "type"  : "text" ,
         "recalcNeeded": 0 ,
       } ;
       this.innerColor = {
-        "value" : "white" ,
-        "label" : "Inner color" ,
+        "value" : "White" ,
+        "labelText" : "Inner color" ,
         "type"  : "select" ,
         "options": colors ,
         "recalcNeeded": 0 ,
       } ;
       this.rimColor = {
-        "value" : "red" ,
-        "label" : "Rim color" ,
+        "value" : "Red" ,
+        "labelText" : "Rim color" ,
         "type"  : "select" ,
         "options": colors ,
         "recalcNeeded": 0 ,
       } ;
       this.haloColor = {
-        "value" : "blue" ,
-        "label" : "Halo color" ,
+        "value" : "Blue" ,
+        "labelText" : "Halo color" ,
         "type"  : "select" ,
         "options": colors ,
         "recalcNeeded": 0 ,
       } ;
       this.outerColor = {
-        "value" : "black" ,
-        "label" : "Outer color" ,
+        "value" : "Black" ,
+        "labelText" : "Outer color" ,
         "type"  : "select" ,
         "options": colors ,
         "recalcNeeded": 0 ,
@@ -106,13 +106,17 @@ document.onreadystatechange = function() {
         var t = ( endDraw - initDraw ) ;
         var millisecondsOrSeconds = t > 1000 ? [ 1 , "s" ] : [ 1000 , "ms" ] ;
         var formattedDelta = Math.round( millisecondsOrSeconds[ 0 ] * t ) / 1000 ;
-        var renderContainer = document.querySelector( "#console" ) ;
-        var promptSymbol = "&gt;&nbsp;"  ;
-        renderContainer.innerHTML = renderContainer.innerHTML +
-                                    "<div class=\"console-msg\">" + msg + "</div>" +
-                                    "<div class=\"console-data\">"+ formattedDelta + " " + millisecondsOrSeconds[ 1 ] + "</div>" ;
-        console.log( renderContainer.scrollHeight ) ;
+        this.consoleLog( msg , formattedDelta + " " + millisecondsOrSeconds[ 1 ] );
       } ;
+
+      this.consoleLog = function( msg , data ) {
+        var renderContainer = document.querySelector( "#console" ) ;
+        formattedMsg =  "<div class=\"console-msg\">" + msg + "</div>" ;
+        formattedData = data ? "<div class=\"console-data\">" + data + "</div>" : "" ;
+        console.log( renderContainer.innerHTML ) ;
+        renderContainer.innerHTML = renderContainer.innerHTML + formattedMsg + formattedData ;
+      }
+
       return this ;
     }.bind( {} ) () ) ;
 
@@ -202,7 +206,7 @@ document.onreadystatechange = function() {
         var outerColor = colors[ $mBrotOptions.outerColor.value ] ;
 
         for( var col = $mBrotOptions.iter.value ; col >= 0 ; col-- ) {
-          var brightnessDecay = 1 / Math.exp( col * $mBrotOptions.outBrightDecay.value / 100 ) ;
+          var brightnessDecay = 1 / Math.exp( col * $mBrotOptions.haloDecay.value / 100 ) ;
           var bezierFactor = col / $mBrotOptions.iter.value ;
           var brightMulti = brightnessDecay * $mBrotOptions.brightness.value ;
           intensityRGB.push( brightnessDecay ) ;
@@ -265,16 +269,39 @@ document.onreadystatechange = function() {
         return this ;
       } ;
 
+      this.fastCalc = function fastCalc() {
+        this.populateCoordArrays() ;
+        var yCoord = xCoord = 0 ;
+        var lenY = yCoordArr.length ;
+        var lenX = xCoordArr.length ;
+        var z = [ 0 , 0 ] , modZSq = 0 ;
+        for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
+          for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
+              z = [ 0, 0 ] ;
+              for( var i = 1 ; i <= $mBrotOptions.iter.value ; i ++ ) {
+                z = [ ( z[ 0 ] * z[ 0 ] - z[ 1 ] * z[ 1 ] + xCoordArr[ xCoord ] ) , ( 2 * z[ 0 ] * z[ 1 ] + yCoordArr[ yCoord ] ) ] ;
+                modZSq = z[ 0 ] * z[ 0 ] + z[ 1 ] * z[ 1 ] ;
+
+                if( modZSq > maxSq ) { // iterations diverge
+                  mandelIterationData[ xCoord + ( lenX * yCoord )] = i ;
+                  break;
+                }
+              }
+              if( i > $mBrotOptions.iter.value ) { // iterations converge
+                mandelIterationData[ xCoord + ( lenX * yCoord )] = $mBrotOptions.iter.value ;
+              }
+          }
+        }
+        return this ;
+      } ;
+
       this.calc = function calc() {
         this.populateCoordArrays() ;
         var yCoord = xCoord = 0 ;
         var lenY = yCoordArr.length ;
         var lenX = xCoordArr.length ;
-
         for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
           for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
-
-              var pixOffset = ( xCoord + yCoord * windowWidth ) * 4 ;
               var z = [ 0 , 0 ] , modZSq = 0 , c = [ xCoordArr[ xCoord ] , yCoordArr[ yCoord ] ] ;
               for( var i = 1 ; i <= $mBrotOptions.iter.value ; i ++ ) {
                 z = this.complexSum( this.complexMult( z , z ) , c ) ;
@@ -284,13 +311,11 @@ document.onreadystatechange = function() {
                   break;
                 }
               }
-
               if( i > $mBrotOptions.iter.value ) { // iterations converge
                 mandelIterationData[ xCoord + ( lenX * yCoord )] = $mBrotOptions.iter.value ;
               }
           }
         }
-
         return this ;
       } ;
 
@@ -301,7 +326,9 @@ document.onreadystatechange = function() {
       } ;
 
       this.render = function render() {
-        $mBrotUtil.performanceExec( this.calc , "Iterate" , this ) ;
+        //$mBrotUtil.performanceExec( this.calc , "Calc" , this ) ;
+        // alternative
+        $mBrotUtil.performanceExec( this.fastCalc , "Fast Calc" , this ) ;
         this.redraw() ;
         return this ;
       } ;
@@ -311,6 +338,8 @@ document.onreadystatechange = function() {
           this.updateColorArr() ;
           this.draw() ;
         } , "Draw" , this ) ;
+        // TODO: abstract console print
+        $mBrotUtil.consoleLog( "DONE" ) ;
         return this ;
       } ;
 
@@ -345,9 +374,6 @@ document.onreadystatechange = function() {
         controls = [] ;
 
         for( var opt in $mBrotOptions ) {
-          var container = document.createElement( "span" ) ;
-          container.id = opt ;
-          var txt = document.createTextNode( $mBrotOptions[ opt ].label ) ;
 
           switch( $mBrotOptions[ opt ].type ) {
             case( "text" ) :
@@ -370,11 +396,19 @@ document.onreadystatechange = function() {
               }
           }
 
-          container.appendChild( txt ) ;
-          container.appendChild( document.createElement( "br" ) ) ;
-          container.appendChild( inputElement ) ;
-          container.appendChild( document.createElement( "br" ) ) ;
-          controls.push( container ) ;
+          var container = document.createElement( "div" ) ;
+          var label = document.createElement( "div" ) ;
+          var txt = document.createTextNode( $mBrotOptions[ opt ].labelText ) ;
+
+          container   .setAttribute( "id"    ,   opt                  ) ;
+          label       .setAttribute( "class" ,  "control-input label" ) ;
+          inputElement.setAttribute( "class" ,  "control-input field" ) ;
+
+          container   .appendChild( inputElement  ) ;
+          label       .appendChild( txt           ) ;
+          container   .appendChild( label         ) ;
+
+          controls    .push( container ) ;
         }
         return this ;
       } ;
