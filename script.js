@@ -8,13 +8,12 @@
  ************************
  */
 
-//  TODO:
-//  1d display coord bounds and save coord history vector
-//     + 1d don't re-calculate unless bounds change
-// .5d image export
-//  2d mobile styles
-//  1d web worker multithread
-//  ?d refactor
+// TODO:
+// display coord bounds and save coord history vector
+// image export
+// mobile styles
+// web worker multithread
+// refactor
 
 document.onreadystatechange = function() {
   if( document.readyState == 'interactive' ) {
@@ -33,66 +32,66 @@ document.onreadystatechange = function() {
       "cyan"     : [   0 , 255 , 255 ] ,
       "magenta"  : [ 255 ,   0 , 255 ] ,
       "yellow"   : [ 255 , 255 ,   0 ] ,
-    }
+     } ;
 
     var $mBrotOptions = ( function() {
       this.max = {          // max mandelbrot value after which we conclude function diverges
         "value" : 2 ,
         "label" : "Max" ,
         "type"  : "text" ,
-        "recalc": 1 ,
-      } ,
-      this.brightness = {        // overall brightness value
-        "value" : 1 ,
-        "label" : "Brightness Multi" ,
-        "type"  : "text" ,
-        "recalc": 0 ,
-      } ,
-      this.zoom = {
-        "value" : 3 ,
-        "label" : "Zoom on click" ,
-        "type"  : "text" ,
-        "recalc": 0 ,
+        "recalcNeeded": 1 ,
       } ,
       this.iter =  {        // initial iter value
         "value" : 25 ,
         "label" : "Iterations" ,
         "type"  : "text" ,
-        "recalc": 1 ,
+        "recalcNeeded": 1 ,
+      } ,
+      this.zoom = {
+        "value" : 3 ,
+        "label" : "Zoom on click" ,
+        "type"  : "text" ,
+        "recalcNeeded": 0 ,
+      } ,
+      this.brightness = {        // overall brightness value
+        "value" : 1 ,
+        "label" : "Brightness Multi" ,
+        "type"  : "text" ,
+        "recalcNeeded": 0 ,
       } ,
       this.outBrightDecay = {
         "value" : 7 ,
         "label" : "Brightness decay" ,
         "type"  : "text" ,
-        "recalc": 0 ,
+        "recalcNeeded": 0 ,
       } ;
       this.innerColor = {
         "value" : "white" ,
         "label" : "Inner color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalc": 0 ,
+        "recalcNeeded": 0 ,
       } ;
       this.rimColor = {
         "value" : "red" ,
         "label" : "Rim color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalc": 0 ,
+        "recalcNeeded": 0 ,
       } ;
       this.haloColor = {
         "value" : "blue" ,
         "label" : "Halo color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalc": 0 ,
+        "recalcNeeded": 0 ,
       } ;
       this.outerColor = {
         "value" : "black" ,
         "label" : "Outer color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalc": 0 ,
+        "recalcNeeded": 0 ,
       } ;
       return this ;
     }.bind( {} ) () ) ;
@@ -100,14 +99,19 @@ document.onreadystatechange = function() {
     var $mBrotUtil = ( function() {
       this.performanceExec = function( f , msg , ctx ) {
         ctx = ctx || this ;
+        msg = msg || "Done in" ;
         var initDraw = performance.now();
-        f.bind(ctx)() ;
+        f.bind( ctx )() ;
         var endDraw = performance.now();
         var t = ( endDraw - initDraw ) ;
         var millisecondsOrSeconds = t > 1000 ? [ 1 , "s" ] : [ 1000 , "ms" ] ;
         var formattedDelta = Math.round( millisecondsOrSeconds[ 0 ] * t ) / 1000 ;
-        var renderContainer = document.querySelector( "#render" ) ;
-        renderContainer.innerHTML = renderContainer.innerHTML + "<br>&gt;&nbsp;" + msg + "<br>" + formattedDelta + " " + millisecondsOrSeconds[ 1 ] + "." ;
+        var renderContainer = document.querySelector( "#console" ) ;
+        var promptSymbol = "&gt;&nbsp;"  ;
+        renderContainer.innerHTML = renderContainer.innerHTML +
+                                    "<div class=\"console-msg\">" + msg + "</div>" +
+                                    "<div class=\"console-data\">"+ formattedDelta + " " + millisecondsOrSeconds[ 1 ] + "</div>" ;
+        console.log( renderContainer.scrollHeight ) ;
       } ;
       return this ;
     }.bind( {} ) () ) ;
@@ -126,8 +130,7 @@ document.onreadystatechange = function() {
       var xCenter = yCenter = 0 ;
       // TODO: remove magic constants. These are good starting values to envelop fractal
       var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
-      var xCoordArr = [] ,
-      yCoordArr = [] ;
+      var xCoordArr = [] , yCoordArr = [] ;
       var xRes , yRes , xCanvasCenter , yCanvasCenter , screenRatio , windowWidth , windowHeight ;
           windowHeight = window.innerHeight || 300 ;
 
@@ -135,7 +138,7 @@ document.onreadystatechange = function() {
 
       var intensityRGB = [] , colorRGB = [] ;
       var R = 0 , G = 1 , B = 2 ;
-      var mandelItersPerPixel ;
+      var mandelIterationData ;
 
       // INIT
 
@@ -149,6 +152,7 @@ document.onreadystatechange = function() {
         canvas.width = xRes = windowWidth ;
         canvas.height = yRes = windowHeight ;
         screenRatio = windowWidth / windowHeight ;
+        mandelIterationData = new Uint8ClampedArray( xRes * yRes ) ;
 
         ( windowWidth > windowHeight ? initHeight : initWidth )() ;
 
@@ -214,10 +218,10 @@ document.onreadystatechange = function() {
       this.populateCoordArrays = function populateCoordArrays() {
         var deltaX = ( xMax - xMin ) / xRes ,
         deltaY = ( yMax - yMin ) / yRes ;
-        for( var i = 0 ; i <= xRes ; i ++ ) {
+        for( var i = 0 ; i < xRes ; i ++ ) {
           xCoordArr[i] = xMin + ( deltaX * i ) ;
         }
-        for( var i = 0 ; i <= yRes ; i ++ ) {
+        for( var i = 0 ; i < yRes ; i ++ ) {
           yCoordArr[i] = yMin + ( deltaY * i ) ;
         }
         return this;
@@ -246,12 +250,14 @@ document.onreadystatechange = function() {
       this.draw = function draw() {
         var lenY = yCoordArr.length ;
         var lenX = xCoordArr.length ;
+        var xCoord , yCoord , curPixel , pixOffset ;
         for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
           for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
-              var pixOffset = ( xCoord + yCoord * windowWidth ) * 4 ;
-              imgData.data[ pixOffset ]     = colorRGB[ mandelItersPerPixel[ xCoord + ( lenX * yCoord )] ][ R ] ;
-              imgData.data[ pixOffset + 1 ] = colorRGB[ mandelItersPerPixel[ xCoord + ( lenX * yCoord )] ][ G ] ;
-              imgData.data[ pixOffset + 2 ] = colorRGB[ mandelItersPerPixel[ xCoord + ( lenX * yCoord )] ][ B ] ;
+              curPixel = xCoord + yCoord * windowWidth ;
+              pixOffset = curPixel * 4 ;
+              imgData.data[ pixOffset     ] = colorRGB[ mandelIterationData[ curPixel ] ][ R ] ;
+              imgData.data[ pixOffset + 1 ] = colorRGB[ mandelIterationData[ curPixel ] ][ G ] ;
+              imgData.data[ pixOffset + 2 ] = colorRGB[ mandelIterationData[ curPixel ] ][ B ] ;
               imgData.data[ pixOffset + 3 ] = 255 ; // alpha
           }
         }
@@ -264,25 +270,23 @@ document.onreadystatechange = function() {
         var yCoord = xCoord = 0 ;
         var lenY = yCoordArr.length ;
         var lenX = xCoordArr.length ;
-        mandelItersPerPixel = [];
 
         for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
           for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
 
               var pixOffset = ( xCoord + yCoord * windowWidth ) * 4 ;
               var z = [ 0 , 0 ] , modZSq = 0 , c = [ xCoordArr[ xCoord ] , yCoordArr[ yCoord ] ] ;
-
               for( var i = 1 ; i <= $mBrotOptions.iter.value ; i ++ ) {
                 z = this.complexSum( this.complexMult( z , z ) , c ) ;
                 modZSq = this.modulusSquared( z ) ;
-                if( modZSq > maxSq ) {
-                  mandelItersPerPixel[ xCoord + ( lenX * yCoord )] = i ;
+                if( modZSq > maxSq ) { // iterations diverge
+                  mandelIterationData[ xCoord + ( lenX * yCoord )] = i ;
                   break;
                 }
               }
 
-              if( i > $mBrotOptions.iter.value ) {
-                mandelItersPerPixel[ xCoord + ( lenX * yCoord )] = $mBrotOptions.iter.value ;
+              if( i > $mBrotOptions.iter.value ) { // iterations converge
+                mandelIterationData[ xCoord + ( lenX * yCoord )] = $mBrotOptions.iter.value ;
               }
           }
         }
@@ -291,21 +295,22 @@ document.onreadystatechange = function() {
       } ;
 
       this.init = function init() {
-        $mBrotUtil.performanceExec( this.initCanvas , "Initialize Canvas" , this ) ;
+        $mBrotUtil.performanceExec( this.initCanvas , "Init" , this ) ;
         this.render() ;
         return this ;
       } ;
 
       this.render = function render() {
-        $mBrotUtil.performanceExec( this.calc , "Calculate" , this ) ;
+        $mBrotUtil.performanceExec( this.calc , "Iterate" , this ) ;
         this.redraw() ;
         return this ;
       } ;
 
       this.redraw = function redraw() {
-        console.log( this ) ;
-        $mBrotUtil.performanceExec( this.updateColorArr , "Update color array" , this ) ;
-        $mBrotUtil.performanceExec( this.draw , "Draw" , this ) ;
+        $mBrotUtil.performanceExec( function() {
+          this.updateColorArr() ;
+          this.draw() ;
+        } , "Draw" , this ) ;
         return this ;
       } ;
 
@@ -381,7 +386,7 @@ document.onreadystatechange = function() {
               var curOpt = form.elements[ opt ].value ;
               curOpt = isNaN( parseFloat( curOpt ) ) ? curOpt : parseFloat( curOpt ) ;
               if( $mBrotOptions[ opt ].value !== curOpt ) {
-                recalcOnSubmit += $mBrotOptions[ opt ].recalc ;
+                recalcOnSubmit += $mBrotOptions[ opt ].recalcNeeded ;
                 $mBrotOptions[ opt ].value = curOpt ;
               }
             }
@@ -394,7 +399,7 @@ document.onreadystatechange = function() {
           ev.preventDefault() ;
           recalcOnSubmit = 0 ;
           this.mapControls() ;
-          console.log( recalcOnSubmit ) ;
+          //console.log( recalcOnSubmit ) ;
           if( recalcOnSubmit !== 0 ) {
             $mBrot.updateParams().render() ;
           } else {
@@ -419,7 +424,6 @@ document.onreadystatechange = function() {
     }.bind({}) () ) ; 
 
     // Let's Roll!
-    
     $mBrot
       .init()
       .listen() ;
