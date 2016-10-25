@@ -14,6 +14,7 @@
 // mobile styles
 // web worker multithread
 // refactor
+// verify redraw not properly recalculating bounds
 
 document.onreadystatechange = function() {
   if( document.readyState == 'interactive' ) {
@@ -32,66 +33,79 @@ document.onreadystatechange = function() {
       "Cyan"     : [   0 , 255 , 255 ] ,
       "Magenta"  : [ 255 ,   0 , 255 ] ,
       "Yellow"   : [ 255 , 255 ,   0 ] ,
-     } ;
+    } ;
 
     var $mBrotOptions = ( function() {
+      var YES = 1 , NO = 0 ;
       this.max = {          // max mandelbrot value after which we conclude function diverges
         "value" : 2 ,
         "labelText" : "Max" ,
         "type"  : "text" ,
-        "recalcNeeded": 1 ,
+        "recalcNeeded": YES ,
       } ,
       this.iter =  {        // initial iter value
-        "value" : 25 ,
+        "value" : 15 ,
         "labelText" : "Iterations" ,
         "type"  : "text" ,
-        "recalcNeeded": 1 ,
+        "recalcNeeded": YES ,
+      } ,
+      this.deltaIter = {
+        "value" : 0 ,
+        "labelText" : "Delta iter" ,
+        "type"  : "text" ,
+        "recalcNeeded": NO ,
       } ,
       this.zoom = {
-        "value" : 3 ,
+        "value" : 1 ,
         "labelText" : "Zoom factor" ,
         "type"  : "text" ,
-        "recalcNeeded": 0 ,
+        "recalcNeeded": NO ,
+      } ,
+      this.rotation = {
+        "value" : 0 ,
+        "labelText" : "Rotation" ,
+        "type"  : "text" ,
+        "recalcNeeded": YES ,
       } ,
       this.brightness = {        // overall brightness value
         "value" : 1 ,
         "labelText" : "Brightness" ,
         "type"  : "text" ,
-        "recalcNeeded": 0 ,
+        "recalcNeeded": NO ,
       } ,
       this.haloDecay = {
         "value" : 7 ,
         "labelText" : "Halo decay" ,
         "type"  : "text" ,
-        "recalcNeeded": 0 ,
+        "recalcNeeded": NO ,
       } ;
       this.innerColor = {
         "value" : "White" ,
         "labelText" : "Inner color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalcNeeded": 0 ,
+        "recalcNeeded": NO ,
       } ;
       this.rimColor = {
         "value" : "Red" ,
         "labelText" : "Rim color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalcNeeded": 0 ,
+        "recalcNeeded": NO ,
       } ;
       this.haloColor = {
         "value" : "Blue" ,
         "labelText" : "Halo color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalcNeeded": 0 ,
+        "recalcNeeded": NO ,
       } ;
       this.outerColor = {
         "value" : "Black" ,
         "labelText" : "Outer color" ,
         "type"  : "select" ,
         "options": colors ,
-        "recalcNeeded": 0 ,
+        "recalcNeeded": NO ,
       } ;
       return this ;
     }.bind( {} ) () ) ;
@@ -104,16 +118,15 @@ document.onreadystatechange = function() {
         f.bind( ctx )() ;
         var endDraw = performance.now();
         var t = ( endDraw - initDraw ) ;
-        var millisecondsOrSeconds = t > 1000 ? [ 1 , "s" ] : [ 1000 , "ms" ] ;
+        var millisecondsOrSeconds = t > 1000 ? [ 1 , "&nbsp;&nbsp;s" ] : [ 1000 ,  "&nbsp;ms" ] ;
         var formattedDelta = Math.round( millisecondsOrSeconds[ 0 ] * t ) / 1000 ;
-        this.consoleLog( msg , formattedDelta + " " + millisecondsOrSeconds[ 1 ] );
+        this.consoleLog( msg , formattedDelta + millisecondsOrSeconds[ 1 ] );
       } ;
 
       this.consoleLog = function( msg , data ) {
         var renderContainer = document.querySelector( "#console" ) ;
         formattedMsg =  "<div class=\"console-msg\">" + msg + "</div>" ;
         formattedData = data ? "<div class=\"console-data\">" + data + "</div>" : "" ;
-        console.log( renderContainer.innerHTML ) ;
         renderContainer.innerHTML = renderContainer.innerHTML + formattedMsg + formattedData ;
       }
 
@@ -121,90 +134,114 @@ document.onreadystatechange = function() {
     }.bind( {} ) () ) ;
 
     var $mBrot = ( function $mBrot() {
-
       // UTILITY VARS
-
       var canvas = document.querySelector( "canvas" ) ;
       var ctx , imgData ;
-
       // INIT PRIVATE VARS
-
       var zoom = 1 ;
       var maxSq = $mBrotOptions.max.value * $mBrotOptions.max.value ; // squared for efficiency
       var xCenter = yCenter = 0 ;
       // TODO: remove magic constants. These are good starting values to envelop fractal
       var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
-      var xCoordArr = [] , yCoordArr = [] ;
-      var xRes , yRes , xCanvasCenter , yCanvasCenter , screenRatio , windowWidth , windowHeight ;
-          windowHeight = window.innerHeight || 300 ;
-
+       //TODO: restore previous init once polar works
+      //var xMin = -2 , xMax = 2 , yMin = -2 , yMax = 2 ;
+      var xWidth , yWidth ;
+      var toReZPlane , toImZPlane ;
+      var xPixWidth , yPixWidth , xCanvasCenter , yCanvasCenter , screenRatio , windowWidth , windowHeight ;
+      //windowHeight = window.innerHeight || 300 ;
       // VIEW
-
       var intensityRGB = [] , colorRGB = [] ;
       var R = 0 , G = 1 , B = 2 ;
-      var mandelIterationData ;
+      var mandelIterationData , localPolarModData , localPolarPhiData , cosMemo , sinMemo ;
 
       // INIT
-
       this.initCanvas = function() {
-        var initHeight = function() { var idealX = ( yMax - yMin ) * ( xRes / yRes ) ; xMin = -3/5 * idealX ; xMax = 2/5 * idealX ; }
-        var initWidth = function() { var idealY = ( yMax - yMin ) * ( yRes / xRes ) ; yMin = - idealY / 2 ; yMax = idealY / 2 ; }
+        if( xPixWidth !== window.innerWidth || yPixWidth !== window.innerHeight ) {
+          // TODO: fix proper redraw on switch from landscape to portrait
+          // keepinginitial draw centered on 0,0 while testing rotation function
+          var initHeight = function() { var idealX = ( yMax - yMin ) * ( xPixWidth / yPixWidth ) ; xMin = -3/5 * idealX ; xMax = 2/5 * idealX ; }
+          //var initHeight = function() { var idealX = ( yMax - yMin ) * ( xPixWidth / yPixWidth ) ; xMin = - idealX / 2 ; xMax = idealX / 2 ; }
+          var initWidth = function() { var idealY = ( yMax - yMin ) * ( yPixWidth / xPixWidth ) ; yMin = - idealY / 2 ; yMax = idealY / 2 ; }
 
-        windowWidth = window.innerWidth || 300 ;
-        windowHeight = window.innerHeight || 300 ;
+          windowWidth = window.innerWidth || 300 ;
+          windowHeight = window.innerHeight || 300 ;
 
-        canvas.width = xRes = windowWidth ;
-        canvas.height = yRes = windowHeight ;
-        screenRatio = windowWidth / windowHeight ;
-        mandelIterationData = new Uint8ClampedArray( xRes * yRes ) ;
+          canvas.width = xPixWidth = windowWidth ;
+          canvas.height = yPixWidth = windowHeight ;
+          screenRatio = windowWidth / windowHeight ;
+          mandelIterationData = new Uint8ClampedArray( xPixWidth * yPixWidth ) ;
 
-        ( windowWidth > windowHeight ? initHeight : initWidth )() ;
+          // TODO: move these to conditional init on rotation != 0
+          const FULL_CIRCLE_DIVS = 360000 ;
+          localPolarModData = new Float32Array( xPixWidth * yPixWidth ) ;
+          localPolarPhiData = new Float32Array( xPixWidth * yPixWidth ) ;
+          cosMemo           = new Float32Array( FULL_CIRCLE_DIVS ) ;
+          sinMemo           = new Float32Array( FULL_CIRCLE_DIVS ) ;
+          this.memoizeSinCos() ;
+          // END
 
-        ctx = canvas.getContext( "2d" ) ;
-        imgData = ctx.getImageData( 0 , 0 , canvas.width , canvas.height ) ;
+          ( windowWidth > windowHeight ? initHeight : initWidth )() ;
+
+          //console.log( "xMinMax upon init: " , xMin , xMax ) ;
+          //console.log( "yMinMax upon init: " , yMin , yMax ) ;
+
+          $mBrotUtil.performanceExec( this.populateViewportPolarArrays , "Polar array" , this ) ;
+
+          ctx = canvas.getContext( "2d" ) ;
+          imgData = ctx.getImageData( 0 , 0 , canvas.width , canvas.height ) ;
+        } ;
 
         return this ;
       } ;
 
       // UTILITY FUNCTIONS
 
-      this.complexMult = function complexMult( c1 , c2 ) {
-        var a = c1[ 0 ] , b = c1[ 1 ] , c = c2[ 0 ] , d = c2[ 1 ] ;
-        return [ ( a*c - b*d ) , ( a*d + b*c ) ] ;
-      } ;
-
-      this.complexSum = function complexSum( c1 , c2 ) {
-        var a = c1[ 0 ] , b = c1[ 1 ] , c = c2[ 0 ] , d = c2[ 1 ] ;
-        return [ ( a + c ) , ( b + d ) ] ;
-      } ;
-
-      this.modulusSquared = function modulusSquared( c1 ) {
-        var a = c1[ 0 ] , b = c1[ 1 ] ;
-        return a*a + b*b ;
-      } ;
-
       this.bezierInterpolateThree = function( P0 , P1 , P2 , t ) {
         return ( 1 - t ) * ( 1 - t ) * P0 +
-               2 * (1 - t ) * t * P1 +
-               t * t * P2 ;
+          2 * (1 - t ) * t * P1 +
+          t * t * P2 ;
       } ;
 
       this.bezierInterpolateFour = function( P0 , P1 , P2 , P3 , t ) {
         return ( 1 - t ) * ( 1 - t ) * ( 1 - t ) * P0 +
-               3 * ( 1 - t ) * ( 1 - t ) * t * P1 +
-               3 * ( 1 - t ) * t * t * P2 +
-               t * t * t * P3 ;
+          3 * ( 1 - t ) * ( 1 - t ) * t * P1 +
+          3 * ( 1 - t ) * t * t * P2 +
+          t * t * t * P3 ;
+      } ;
+
+      this.memoizeSinCos = function memoizeSinCos() {
+        var divsPerHalfPi = 90000 ;
+        var halfPiOffsetX1 = divsPerHalfPi ;
+        var halfPiOffsetX2 = 2 * divsPerHalfPi ;
+        var halfPiOffsetX3 = 3 * divsPerHalfPi ;
+        var step = Math.PI / divsPerHalfPi ;
+        var curCos , curSin ;
+        for( var i = 0 ; i < 90000 ; i++ ) {
+          curCos = Math.cos( step * i ) ;
+          curSin = Math.sin( step * i ) ;
+          cosMemo[ i ]                  =   curCos ;
+          sinMemo[ i ]                  =   curSin ;
+          cosMemo[ i + halfPiOffsetX1 ] = - curSin ;
+          sinMemo[ i + halfPiOffsetX1 ] =   curCos ;
+          cosMemo[ i + halfPiOffsetX2 ] = - curCos ;
+          sinMemo[ i + halfPiOffsetX2 ] = - curSin ;
+          cosMemo[ i + halfPiOffsetX3 ] =   curSin ;
+          sinMemo[ i + halfPiOffsetX3 ] = - curCos ;
+        }
+        //console.log( "cos array length: " + cosMemo.length ) ;
+        //console.log( "cos array memory (MB): " + cosMemo.byteLength / 1048576 ) ;
+        //console.log( "sin array length: " + sinMemo.length ) ;
+        //console.log( "sin array memory (MB): " + sinMemo.byteLength / 1048576 ) ;
+        return this ;
       } ;
 
       this.updateColorArr = function() {
         intensityRGB = [] ;
         colorRGB = [] ;
-
         var innerColor = colors[ $mBrotOptions.innerColor.value ] ;
         var rimColor   = colors[ $mBrotOptions.rimColor.value ] ;
         var haloColor  = colors[ $mBrotOptions.haloColor.value ] ;
         var outerColor = colors[ $mBrotOptions.outerColor.value ] ;
-
         for( var col = $mBrotOptions.iter.value ; col >= 0 ; col-- ) {
           var brightnessDecay = 1 / Math.exp( col * $mBrotOptions.haloDecay.value / 100 ) ;
           var bezierFactor = col / $mBrotOptions.iter.value ;
@@ -220,115 +257,141 @@ document.onreadystatechange = function() {
       } ;
 
       this.populateCoordArrays = function populateCoordArrays() {
-        var deltaX = ( xMax - xMin ) / xRes ,
-        deltaY = ( yMax - yMin ) / yRes ;
-        for( var i = 0 ; i < xRes ; i ++ ) {
-          xCoordArr[i] = xMin + ( deltaX * i ) ;
-        }
-        for( var i = 0 ; i < yRes ; i ++ ) {
-          yCoordArr[i] = yMin + ( deltaY * i ) ;
+        toReZPlane = [] ; toImZPlane = [] ;
+        var deltaX = ( xMax - xMin ) / xPixWidth , deltaY = ( yMax - yMin ) / yPixWidth , i = 0 ;
+        for( i = 0 ; i < xPixWidth ; i ++ ) { toReZPlane[i] = xMin + ( deltaX * i ) ; }
+        for( i = 0 ; i < yPixWidth ; i ++ ) { toImZPlane[i] = yMin + ( deltaY * i ) ; }
+        return this;
+      } ;
+
+      this.populateViewportPolarArrays = function populateViewportPolarArrays() {
+        var curPixel , offsetXCoord , offsetYCoord ;
+        for( var yCoord = 0 , offsetY = Math.floor( yPixWidth / 2 ) ; yCoord < yPixWidth ; yCoord ++ ) {
+          for( var xCoord = 0 , offsetX = Math.floor( xPixWidth / 2 ) ; xCoord < xPixWidth ; xCoord ++ ) {
+            offsetXCoord  = xCoord - offsetX ;
+            offsetYCoord  = yCoord - offsetY ;
+            curPixel      = xCoord + yCoord * windowWidth ;
+            localPolarModData[ curPixel ] = Math.sqrt( offsetXCoord * offsetXCoord + offsetYCoord * offsetYCoord ) ;
+            localPolarPhiData[ curPixel ] = Math.atan( offsetXCoord === 0 ? offsetYCoord / 0.0000001 : offsetYCoord / offsetXCoord ) ;
+            localPolarPhiData[ curPixel ] += offsetXCoord < 0 ? Math.PI : 0 ;
+          }
         }
         return this;
       } ;
 
-      this.updateParams = function updateParams( ev ) {
+      this.updateDrawParams = function updateDrawParams( ev ) {
         maxSq = $mBrotOptions.max.value * $mBrotOptions.max.value ;
         if( !! ev ) { // onClick update, as opposed to form submit update
-          // update zoom factor
-          zoom *= $mBrotOptions.zoom.value ;
-          $mBrotOptions.iter.value += 2 ;
+          xWidth = xMax - xMin , yWidth = yMax - yMin ;
+          // update iter count
+          $mBrotOptions.iter.value += $mBrotOptions.deltaIter.value ;
           // update center
           xCanvasCenter = ev.layerX - canvas.offsetLeft ;
           yCanvasCenter = ev.layerY - canvas.offsetTop ;
           // remap center to complex plane
-          xCenter = ( ( xCanvasCenter / xRes ) * ( xMax - xMin ) ) + xMin ;
-          yCenter = ( ( yCanvasCenter / yRes ) * ( yMax - yMin ) ) + yMin ;
-          xMin = xCenter - screenRatio * ( 2 / zoom ) ;
-          xMax = xCenter + screenRatio * ( 2 / zoom ) ;
-          yMin = yCenter - ( 2 / zoom ) ;
-          yMax = yCenter + ( 2 / zoom ) ;
+          xCenter = ( ( xCanvasCenter / xPixWidth ) * xWidth ) + xMin ;
+          yCenter = ( ( yCanvasCenter / yPixWidth ) * yWidth ) + yMin ;
+          xMin = xCenter - ( xWidth / ( 2 * $mBrotOptions.zoom.value ) ) ;
+          xMax = xCenter + ( xWidth / ( 2 * $mBrotOptions.zoom.value ) ) ;
+          yMin = yCenter - ( yWidth / ( 2 * $mBrotOptions.zoom.value ) )  ;
+          yMax = yCenter + ( yWidth / ( 2 * $mBrotOptions.zoom.value ) ) ;
         }
         return this ; 
       } ;
 
       this.draw = function draw() {
-        var lenY = yCoordArr.length ;
-        var lenX = xCoordArr.length ;
-        var xCoord , yCoord , curPixel , pixOffset ;
+        var lenY = toImZPlane.length , lenX = toReZPlane.length , xCoord , yCoord , curPixel , pixOffset ;
+        //console.log( imgData.data.length ) ;
+        //console.log( ( lenX * lenY ) * 4  );
         for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
           for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
-              curPixel = xCoord + yCoord * windowWidth ;
-              pixOffset = curPixel * 4 ;
-              imgData.data[ pixOffset     ] = colorRGB[ mandelIterationData[ curPixel ] ][ R ] ;
-              imgData.data[ pixOffset + 1 ] = colorRGB[ mandelIterationData[ curPixel ] ][ G ] ;
-              imgData.data[ pixOffset + 2 ] = colorRGB[ mandelIterationData[ curPixel ] ][ B ] ;
-              imgData.data[ pixOffset + 3 ] = 255 ; // alpha
+            curPixel = xCoord + yCoord * windowWidth ;
+            pixOffset = curPixel * 4 ;
+            imgData.data[ pixOffset     ] = colorRGB[ mandelIterationData[ curPixel ] ][ R ] ;
+            imgData.data[ pixOffset + 1 ] = colorRGB[ mandelIterationData[ curPixel ] ][ G ] ;
+            imgData.data[ pixOffset + 2 ] = colorRGB[ mandelIterationData[ curPixel ] ][ B ] ;
+            imgData.data[ pixOffset + 3 ] = 255 ; // alpha
           }
         }
         ctx.putImageData( imgData, 0 , 0 ); 
         return this ;
       } ;
 
-      this.fastCalc = function fastCalc() {
-        this.populateCoordArrays() ;
-        var yCoord = xCoord = 0 ;
-        var lenY = yCoordArr.length ;
-        var lenX = xCoordArr.length ;
-        var z = [ 0 , 0 ] , modZSq = 0 ;
-        for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
-          for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
-              z = [ 0, 0 ] ;
-              for( var i = 1 ; i <= $mBrotOptions.iter.value ; i ++ ) {
-                z = [ ( z[ 0 ] * z[ 0 ] - z[ 1 ] * z[ 1 ] + xCoordArr[ xCoord ] ) , ( 2 * z[ 0 ] * z[ 1 ] + yCoordArr[ yCoord ] ) ] ;
-                modZSq = z[ 0 ] * z[ 0 ] + z[ 1 ] * z[ 1 ] ;
-
-                if( modZSq > maxSq ) { // iterations diverge
-                  mandelIterationData[ xCoord + ( lenX * yCoord )] = i ;
-                  break;
-                }
-              }
-              if( i > $mBrotOptions.iter.value ) { // iterations converge
-                mandelIterationData[ xCoord + ( lenX * yCoord )] = $mBrotOptions.iter.value ;
-              }
-          }
-        }
-        return this ;
-      } ;
-
       this.calc = function calc() {
         this.populateCoordArrays() ;
-        var yCoord = xCoord = 0 ;
-        var lenY = yCoordArr.length ;
-        var lenX = xCoordArr.length ;
+        var lenY = toImZPlane.length ;
+        var lenX = toReZPlane.length ;
+        var iter = 1 ;
+        var yCoord , xCoord , curPixel , z , modZSq ;
         for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
           for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
-              var z = [ 0 , 0 ] , modZSq = 0 , c = [ xCoordArr[ xCoord ] , yCoordArr[ yCoord ] ] ;
-              for( var i = 1 ; i <= $mBrotOptions.iter.value ; i ++ ) {
-                z = this.complexSum( this.complexMult( z , z ) , c ) ;
-                modZSq = this.modulusSquared( z ) ;
-                if( modZSq > maxSq ) { // iterations diverge
-                  mandelIterationData[ xCoord + ( lenX * yCoord )] = i ;
-                  break;
-                }
+            z = [ 0 , 0 ] ;
+            curPixel = xCoord + lenX * yCoord ;
+            for( iter = 1 ; iter <= $mBrotOptions.iter.value ; iter++ ) {
+              z = [ z[ 0 ] * z[ 0 ] - z[ 1 ] * z[ 1 ] + toReZPlane[ xCoord ] , 2 * z[ 0 ] * z[ 1 ] + toImZPlane[ yCoord ] ] ;
+              modZSq = z[ 0 ] * z[ 0 ] + z[ 1 ] * z[ 1 ] ;
+              if( modZSq > maxSq ) { // iterations diverge
+                mandelIterationData[ curPixel ] = iter ;
+                break;
               }
-              if( i > $mBrotOptions.iter.value ) { // iterations converge
-                mandelIterationData[ xCoord + ( lenX * yCoord )] = $mBrotOptions.iter.value ;
-              }
+            }
+            if( iter > $mBrotOptions.iter.value ) { // iterations converge
+              mandelIterationData[ curPixel ] = $mBrotOptions.iter.value ;
+            }
           }
         }
         return this ;
       } ;
 
-      this.init = function init() {
-        $mBrotUtil.performanceExec( this.initCanvas , "Init" , this ) ;
-        this.render() ;
+      this.rotComplex = function rotComplex( c , phi ) {
+        var Re = 0 , Im = 1 ;
+        var curPix = Math.floor( c[ Re ] + c[ Im ] * windowWidth ) ;
+        //var curPix = c[ Re ] + c[ Im ] * windowWidth ;
+        return  [ ( xPixWidth / 2 + Math.cos( localPolarPhiData[ curPix ] + phi ) * localPolarModData[ curPix ] ) ,
+                  ( yPixWidth / 2 + Math.sin( localPolarPhiData[ curPix ] + phi ) * localPolarModData[ curPix ] ) ] ;
+        //return c;
+      } ;
+
+      this.polarCalc = function polarCalc() {
+        //var deltaAngle = Math.PI / 8  ; // constant offset for now
+        var deltaAngle = - Math.PI * $mBrotOptions.rotation.value / 180 ; 
+        this.populateCoordArrays() ;
+        var lenY = toImZPlane.length ;
+        var lenX = toReZPlane.length ;
+        var iter = 1 ;
+        var yCoord , xCoord , curPixel , z , modZSq , rotComplex , Re = 0 , Im = 1 ;
+        for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
+          for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
+            z = [ 0 , 0 ] ;
+            rotatedC = this.rotComplex( [ xCoord , yCoord ] , deltaAngle ) ;
+            curPixel = xCoord + lenX * yCoord ;
+            //debugger;
+            var count = 0 ;
+            for( iter = 1 ; iter <= $mBrotOptions.iter.value ; iter++ ) {
+              z = [ z[ 0 ] * z[ 0 ] - z[ 1 ] * z[ 1 ] + toReZPlane[ Math.floor( rotatedC[ Re ] ) ] , 2 * z[ 0 ] * z[ 1 ] +  toImZPlane[ Math.floor( rotatedC[ Im ] ) ] ] ;
+              modZSq = z[ 0 ] * z[ 0 ] + z[ 1 ] * z[ 1 ] ;
+              if( modZSq > maxSq ) { // iterations diverge
+                mandelIterationData[ curPixel ] = iter ;
+                count += 1 ;
+                break;
+              }
+            }
+            if( iter > $mBrotOptions.iter.value ) { // iterations converge
+              mandelIterationData[ curPixel ] = $mBrotOptions.iter.value ;
+            }
+          }
+        }
         return this ;
       } ;
 
       this.render = function render() {
+        $mBrotUtil.performanceExec( this.initCanvas , "Init" , this ) ;
+        //$mBrotUtil.consoleLog( "Relative" , "(" + xPixWidth / 2 + "," + yPixWidth / 2 + "i)" ) ;
         //$mBrotUtil.performanceExec( this.calc , "Calc" , this ) ;
-        // alternative
-        $mBrotUtil.performanceExec( this.fastCalc , "Fast Calc" , this ) ;
+        $mBrotUtil.performanceExec( this.polarCalc , "Polar calc" , this ) ;
+        //$mBrotUtil.consoleLog( "Render" , "(" + Math.round( 1000 * xCenter ) / 1000 + "," + Math.round( 1000 * yCenter ) / 1000 + "i)" ) ;
+        //$mBrotUtil.consoleLog( "Delta per pixel" , "(" + Math.round( 10000 * xWidth / xPixWidth ) + "," + Math.round( 10000 * yWidth / yPixWidth ) + "i)" ) ;
+        //$mBrotUtil.performanceExec( this.polarCalc , "Calc" , this ) ;
         this.redraw() ;
         return this ;
       } ;
@@ -339,14 +402,14 @@ document.onreadystatechange = function() {
           this.draw() ;
         } , "Draw" , this ) ;
         // TODO: abstract console print
-        $mBrotUtil.consoleLog( "DONE" ) ;
+        $mBrotUtil.consoleLog( "Done" ) ;
         return this ;
       } ;
 
       this.listen = function listen() {
         canvas.addEventListener( "click" , function( ev ) {
           $mBrotControls.mapControls() ;
-          this.updateParams( ev ).render() ;
+          this.updateDrawParams( ev ).render() ;
           $mBrotControls.createControls().render() ;
         }.bind( this ) ) ;
         return this ;
@@ -414,18 +477,17 @@ document.onreadystatechange = function() {
       } ;
 
       this.mapControls = function() {
-          for( var opt in $mBrotOptions ) {
-            //console.log( recalcOnSubmit ) ;
-            if( form.hasOwnProperty( opt ) ) {
-              var curOpt = form.elements[ opt ].value ;
-              curOpt = isNaN( parseFloat( curOpt ) ) ? curOpt : parseFloat( curOpt ) ;
-              if( $mBrotOptions[ opt ].value !== curOpt ) {
-                recalcOnSubmit += $mBrotOptions[ opt ].recalcNeeded ;
-                $mBrotOptions[ opt ].value = curOpt ;
-              }
+        for( var opt in $mBrotOptions ) {
+          if( form.hasOwnProperty( opt ) ) {
+            var curOpt = form.elements[ opt ].value ;
+            curOpt = isNaN( parseFloat( curOpt ) ) ? curOpt : parseFloat( curOpt ) ;
+            if( $mBrotOptions[ opt ].value !== curOpt ) {
+              recalcOnSubmit += $mBrotOptions[ opt ].recalcNeeded ;
+              $mBrotOptions[ opt ].value = curOpt ;
             }
           }
-          return this ;
+        }
+        return this ;
       } ;
 
       this.listen = function() {
@@ -433,9 +495,8 @@ document.onreadystatechange = function() {
           ev.preventDefault() ;
           recalcOnSubmit = 0 ;
           this.mapControls() ;
-          //console.log( recalcOnSubmit ) ;
           if( recalcOnSubmit !== 0 ) {
-            $mBrot.updateParams().render() ;
+            $mBrot.updateDrawParams().render() ;
           } else {
             $mBrot.redraw() ;
           }
@@ -459,10 +520,11 @@ document.onreadystatechange = function() {
 
     // Let's Roll!
     $mBrot
-      .init()
+      .render()
       .listen() ;
     $mBrotControls
       .init()
       .listen() ;
+
   }
 }
