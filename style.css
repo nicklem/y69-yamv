@@ -84,6 +84,7 @@ canvas {
 }
 
 .control-input.field {
+  position: relative;
   clear: both;
   width: 40%;
   color: #ccc;
@@ -94,6 +95,22 @@ canvas {
 .control-input.field:focus {
   outline: 1px dotted #555;
   color: #eee;
+}
+
+.control-input.beta {
+  position: relative;
+  left: -0.5rem;
+  /*bottom: -0.2rem;*/
+  /*text-transform: uppercase;*/
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px #000;
+  background-color: #700;
+  border-radius: 3rem;
+  padding: 0.2rem 0.5rem;
+  /*width: 2rem;*/
+  text-align: center;
+  /*transform: rotate(-45deg);*/
 }
 
 input[type=submit] {
