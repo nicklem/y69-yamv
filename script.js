@@ -9,7 +9,7 @@
  */
 
 // TODO:
-// proper onclick mapping when rotated
+// REFACTOR FOR GODS SAKE
 // display coord bounds and save coord history vector
 // antialiasing
 // web worker multithread
@@ -310,6 +310,15 @@ document.onreadystatechange = function() {
         return this;
       } ;
 
+      this.rotComplex = function rotComplex( c , rot ) {
+        var curPixRotOffset = ( c[ 0 ] + xRotBoundOffset ) + ( c[ 1 ] + yRotBoundOffset ) * xPixWidth ;
+        var rotTransform = rot + pixPolarPhi[ curPixRotOffset ] ;
+        return  [
+          Math.floor( xPixWidth / 2 + Math.cos( rotTransform ) * pixPolarMod[ curPixRotOffset ] ) ,
+          Math.floor( yPixWidth / 2 + Math.sin( rotTransform ) * pixPolarMod[ curPixRotOffset ] ) ,
+          ];
+      } ;
+
       this.updateDrawParams = function updateDrawParams( ev ) {
         maxSq = $opt.max.value * $opt.max.value ;
         if( !! ev ) { // onClick update, as opposed to form submit update
@@ -320,6 +329,11 @@ document.onreadystatechange = function() {
           // update center
           xPixCenter = ev.layerX - canvas.offsetLeft ;
           yPixCenter = ev.layerY - canvas.offsetTop ;
+          console.log( xPixCenter , yPixCenter ) ;
+          var rotX = this.rotComplex( [ xPixCenter , yPixCenter ] , this.toRad( -$opt.rot.value ) ) ;
+          xPixCenter = rotX[ 0 ] ;
+          yPixCenter = rotX[ 1 ] ;
+          console.log( xPixCenter , yPixCenter ) ;
           // remap center to complex plane
           xCenter = xMin + ( xPixCenter / xPixWidth ) * xWidth ;
           yCenter = yMin + ( yPixCenter / yPixWidth ) * yWidth ;
@@ -361,7 +375,7 @@ document.onreadystatechange = function() {
       this.draw = function draw() {
         var lenY = toImZ.length , lenX = toReZ.length ,
         xCoord , yCoord ,
-        curPixel , pixOffset ;
+        curPixel , curPixelOffset , pixOffset ;
         //try { 
         for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
           for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
@@ -406,15 +420,6 @@ document.onreadystatechange = function() {
           //}
         //}
         //return this ;
-      //} ;
-
-      //this.rotComplex = function rotComplex( c , rot ) {
-        //var curPix = Math.floor( c[ 0 ] + c[ 1 ] * xPixWidth ) ;
-        //var rotTransform = rot + pixPolarPhi[ curPix ] ;
-        //return  [
-          //Math.floor( xPixWidth / 2 + Math.cos( rotTransform ) * pixPolarMod[ curPix ] ) ,
-          //Math.floor( yPixWidth / 2 + Math.sin( rotTransform ) * pixPolarMod[ curPix ] ) ,
-          //];
       //} ;
 
       this.polarCalc = function polarCalc() {
