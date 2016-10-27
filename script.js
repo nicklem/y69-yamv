@@ -45,7 +45,7 @@ document.onreadystatechange = function() {
         "recalcNeeded": YES ,
       } ,
       this.iter =  {
-        "value" : 15 ,
+        "value" : 25 ,
         "labelText" : "Iterations" ,
         "type"  : "text" ,
         "recalcNeeded": YES ,
@@ -124,10 +124,10 @@ document.onreadystatechange = function() {
       this.timeExec = function( f , context ) {
         const VALUE = 0 , UNIT = 1 ;
         var c = context || this ;
-        var initDraw = performance.now();
+        var initTime = performance.now();
         f.bind( c )() ;
-        var endDraw = performance.now();
-        var t = ( endDraw - initDraw ) ;
+        var endTime = performance.now();
+        var t = ( endTime - initTime ) ;
         var mSecOrSec = t > 1000 ? [ 1 , "&nbsp;&nbsp;s" ] : [ 1000 ,  "&nbsp;ms" ] ;
         var delta = Math.round( mSecOrSec[  VALUE ] * t ) / 1000 ;
         return delta + mSecOrSec[ UNIT ] ;
@@ -157,7 +157,7 @@ document.onreadystatechange = function() {
 
       // IMAGINARY PLANE VARS
       var xCenter , yCenter ;
-       //TODO: restore previous init once polar works
+      //TODO: restore previous init once polar works
       //var xMin = -2 , xMax = 2 , yMin = -2 , yMax = 2 ;
       var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
 
@@ -165,18 +165,17 @@ document.onreadystatechange = function() {
       var toReZ , toImZ ;
 
       // CONVERSION VECTORS FROM PIXELS TO COMPLEX - ROTATION
-      var pixPolarMod , pixPolarPhi , cosMemo , sinMemo , rotCalc = 0 ;
-      var xRotBoundOffset , yRotBoundOffset ;
-      var xRotBoundExtension , yRotBoundExtension ;
-      this.isRotated = function() { return Math.round( 10 * $opt.rot.value ) !== 0 ; } ;
-      this.isNewAngle = function() { return $opt.rot.value !== rotCalc ; } ;
+      var pixPolarMod , pixPolarPhi , rotCalc = 0 ;
+      //var cosMemo , sinMemo ;
+      var xRotBoundOffset = 0 , yRotBoundOffset = 0;
+      var xRotBoundExtension = 0, yRotBoundExtension = 0;
 
       // VIEWPORT VARS
       var xPixWidth , yPixWidth ,
-          xPixCenter , yPixCenter ;
+      xPixCenter , yPixCenter ;
 
       // COLORIZE VARS
-      var intensityRGB = [] , colorRGB = [] ;
+      var colorRGB = [] ;
       var R = 0 , G = 1 , B = 2 ;
 
       // INIT
@@ -201,6 +200,10 @@ document.onreadystatechange = function() {
         return this ;
       } ;
 
+      this.hasWorkers = function() { return !! window.Worker ; } ;
+
+      this.maxThreads = function() { return !! navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 1 ; } ;
+
       this.initCalc = function() {
         mandelIterData = new Uint8ClampedArray( ( xPixWidth + xRotBoundExtension ) * ( yPixWidth + yRotBoundExtension ) ) ;
         return this ;
@@ -208,7 +211,6 @@ document.onreadystatechange = function() {
 
       this.initPolarCalc = function() {
         this.calcRotBoundExtension() ;
-        //this.memoizeSinCos() ;
         this.populateViewportPolarArrays() ;
         return this ;
       } ;
@@ -233,30 +235,29 @@ document.onreadystatechange = function() {
       } ;
 
       //this.memoizeSinCos = function memoizeSinCos() {
-        //var divsPerHalfPi = 900 ;
-        //var halfPiOffsetX1 = divsPerHalfPi ;
-        //var halfPiOffsetX2 = 2 * divsPerHalfPi ;
-        //var halfPiOffsetX3 = 3 * divsPerHalfPi ;
-        //var step = Math.PI / divsPerHalfPi ;
-        //var curCos , curSin ;
-        //for( var i = 0 ; i < divsPerHalfPi ; i++ ) {
-          //curCos = Math.cos( step * i ) ;
-          //curSin = Math.sin( step * i ) ;
-          ////console.log( curCos, curSin) ;
-          //cosMemo[ i ]                  =   curCos ;
-          //cosMemo[ i + halfPiOffsetX1 ] = - curSin ;
-          //cosMemo[ i + halfPiOffsetX2 ] = - curCos ;
-          //cosMemo[ i + halfPiOffsetX3 ] =   curSin ;
-          //sinMemo[ i ]                  =   curSin ;
-          //sinMemo[ i + halfPiOffsetX1 ] =   curCos ;
-          //sinMemo[ i + halfPiOffsetX2 ] = - curSin ;
-          //sinMemo[ i + halfPiOffsetX3 ] = - curCos ;
-        //}
-        //return this ;
+      //var divsPerHalfPi = 900 ;
+      //var halfPiOffsetX1 = divsPerHalfPi ;
+      //var halfPiOffsetX2 = 2 * divsPerHalfPi ;
+      //var halfPiOffsetX3 = 3 * divsPerHalfPi ;
+      //var step = Math.PI / divsPerHalfPi ;
+      //var curCos , curSin ;
+      //for( var i = 0 ; i < divsPerHalfPi ; i++ ) {
+      //curCos = Math.cos( step * i ) ;
+      //curSin = Math.sin( step * i ) ;
+      ////console.log( curCos, curSin) ;
+      //cosMemo[ i ]                  =   curCos ;
+      //cosMemo[ i + halfPiOffsetX1 ] = - curSin ;
+      //cosMemo[ i + halfPiOffsetX2 ] = - curCos ;
+      //cosMemo[ i + halfPiOffsetX3 ] =   curSin ;
+      //sinMemo[ i ]                  =   curSin ;
+      //sinMemo[ i + halfPiOffsetX1 ] =   curCos ;
+      //sinMemo[ i + halfPiOffsetX2 ] = - curSin ;
+      //sinMemo[ i + halfPiOffsetX3 ] = - curCos ;
+      //}
+      //return this ;
       //} ;
 
       this.updateColorArr = function() {
-        intensityRGB = [] ;
         colorRGB = [] ;
         var innerColor = colors[ $opt.innerColor.value ] ;
         var rimColor   = colors[ $opt.rimColor.value ] ;
@@ -266,7 +267,6 @@ document.onreadystatechange = function() {
           var brightnessDecay = 1 / Math.exp( col * $opt.haloDecay.value / 100 ) ;
           var bezierFactor = col / $opt.iter.value ;
           var brightMulti = brightnessDecay * $opt.brightness.value ;
-          intensityRGB.push( brightnessDecay ) ;
           colorRGB.push( [
               this.bezier4( innerColor[ R ] , rimColor[ R ] , haloColor[R] , outerColor[ R ] , bezierFactor ) * brightMulti ,
               this.bezier4( innerColor[ G ] , rimColor[ G ] , haloColor[G] , outerColor[ G ] , bezierFactor ) * brightMulti ,
@@ -279,7 +279,7 @@ document.onreadystatechange = function() {
       this.populateCoordArrays = function populateCoordArrays() {
         toReZ = [] ; toImZ = [] ;
         var deltaX = ( xMax - xMin ) / xPixWidth ,
-            deltaY = ( yMax - yMin ) / yPixWidth ;
+        deltaY = ( yMax - yMin ) / yPixWidth ;
         for( i = 0 ; i < ( xPixWidth + xRotBoundExtension ) ; i++ ) { toReZ[i] = xMin + ( deltaX * ( i - xRotBoundOffset ) ) ; }
         for( i = 0 ; i < ( yPixWidth + yRotBoundExtension ) ; i++ ) { toImZ[i] = yMin + ( deltaY * ( i - yRotBoundOffset ) ) ; }
         return this;
@@ -299,10 +299,10 @@ document.onreadystatechange = function() {
             pixPolarMod[ curPixel ] = 2 * Math.PI + Math.sqrt( offsetXCoord * offsetXCoord + offsetYCoord * offsetYCoord ) ;
             pixPolarPhi[ curPixel ] = 2 * Math.PI + Math.atan( offsetXCoord === 0 ? offsetYCoord / 0.0000001 : offsetYCoord / offsetXCoord ) ;
             pixPolarPhi[ curPixel ] += offsetXCoord < 0 ? Math.PI : 0 ;
-            // TODO: 
+            // TODO: special fx!
             //if( true ) {
-              //if( pixPolarPhi[ curPixel ] > Math.PI / 1 )
-                //pixPolarPhi[ curPixel ] = ( Math.round( 1000 * pixPolarPhi[ curPixel ] ) % ( Math.PI * 1000 / 1 ) ) / 1000 ;
+            //if( pixPolarPhi[ curPixel ] > Math.PI / 1 )
+            //pixPolarPhi[ curPixel ] = ( Math.round( 1000 * pixPolarPhi[ curPixel ] ) % ( Math.PI * 1000 / 1 ) ) / 1000 ;
             //}
           }
         }
@@ -316,7 +316,7 @@ document.onreadystatechange = function() {
         return  [
           Math.floor( xPixWidth / 2 + Math.cos( rotTransform ) * pixPolarMod[ curPixRotOffset ] ) ,
           Math.floor( yPixWidth / 2 + Math.sin( rotTransform ) * pixPolarMod[ curPixRotOffset ] ) ,
-          ];
+        ];
       } ;
 
       this.updateDrawParams = function updateDrawParams( ev ) {
@@ -329,12 +329,13 @@ document.onreadystatechange = function() {
           // update center
           xPixCenter = ev.layerX - canvas.offsetLeft ;
           yPixCenter = ev.layerY - canvas.offsetTop ;
-          console.log( xPixCenter , yPixCenter ) ;
-          var rotX = this.rotComplex( [ xPixCenter , yPixCenter ] , this.toRad( -$opt.rot.value ) ) ;
+          // remap click event if plane rotated
+          var rotX = $opt.renderEngine.value === "Polar" ?
+            this.rotComplex( [ xPixCenter , yPixCenter ] , this.toRad( -$opt.rot.value ) ) :
+            [ xPixCenter , yPixCenter ] ;
           xPixCenter = rotX[ 0 ] ;
           yPixCenter = rotX[ 1 ] ;
-          console.log( xPixCenter , yPixCenter ) ;
-          // remap center to complex plane
+          // update center to complex plane
           xCenter = xMin + ( xPixCenter / xPixWidth ) * xWidth ;
           yCenter = yMin + ( yPixCenter / yPixWidth ) * yWidth ;
           xMin = xCenter - ( xWidth / ( 2 * $opt.zoom.value ) ) ;
@@ -349,14 +350,14 @@ document.onreadystatechange = function() {
         if( $opt.renderEngine.value === "Polar" ) {
           var l = xPixWidth / 2 , h = yPixWidth / 2 ;
           var diag = Math.sqrt( l * l + h * h ) ;
-          xRotBoundOffset = yRotBoundOffset = Math.ceil( diag - ( l < h ? l : h ) ) + 10 ;
+          var pinchCorrection = 10 ;
+          xRotBoundOffset = yRotBoundOffset = Math.ceil( diag - ( l < h ? l : h ) ) + pinchCorrection ;
           xRotBoundExtension = 2 * xRotBoundOffset ;
           yRotBoundExtension = 2 * xRotBoundOffset ;
-          console.log( xRotBoundOffset ) ;
-          console.log( yRotBoundOffset ) ;
         } else {
           xRotBoundOffset = yRotBoundOffset = xRotBoundExtension = yRotBoundExtension = 0 ; 
         }
+        // TODO: can shave off % on extended rotation bounds calculation. Now it calcs the whole diagonal box
         //var phiH = Math.atan( h / l ) ;
         //var phiL = Math.atan( l / h ) ;
         //var rot = this.toRad( $opt.rot.value ) ;
@@ -372,87 +373,63 @@ document.onreadystatechange = function() {
         //yRotBoundOffset = Math.round( deltaPixHeigth + 1 );
       } ;
 
-      this.draw = function draw() {
+      this.draw = function draw( yStart , yEnd ) {
         var lenY = toImZ.length , lenX = toReZ.length ,
         xCoord , yCoord ,
-        curPixel , curPixelOffset , pixOffset ;
-        //try { 
-        for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
+        curPixel , curPixRotOffset , RGBAPixOffset ;
+        for( yCoord = yStart ; yCoord < yEnd ; yCoord++ ) {
           for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
-            curPixelOffset = ( xCoord + xRotBoundOffset ) + ( yCoord + yRotBoundOffset ) * xPixWidth ;
+            curPixRotOffset = ( xCoord + xRotBoundOffset ) + ( yCoord + yRotBoundOffset ) * xPixWidth ;
             curPixel = xCoord + yCoord * xPixWidth ;
-            pixOffset = curPixel * 4 ;
-            imgData.data[ pixOffset     ] = colorRGB[ mandelIterData[ curPixelOffset ] ][ R ] ;
-            imgData.data[ pixOffset + 1 ] = colorRGB[ mandelIterData[ curPixelOffset ] ][ G ] ;
-            imgData.data[ pixOffset + 2 ] = colorRGB[ mandelIterData[ curPixelOffset ] ][ B ] ;
-            imgData.data[ pixOffset + 3 ] = 255 ; // alpha
+            RGBAPixOffset = curPixel * 4 ;
+            imgData.data[ RGBAPixOffset     ] = colorRGB[ mandelIterData[ curPixRotOffset ] ][ R ] ;
+            imgData.data[ RGBAPixOffset + 1 ] = colorRGB[ mandelIterData[ curPixRotOffset ] ][ G ] ;
+            imgData.data[ RGBAPixOffset + 2 ] = colorRGB[ mandelIterData[ curPixRotOffset ] ][ B ] ;
+            imgData.data[ RGBAPixOffset + 3 ] = 255 ; // alpha
           }
         }
-        //} catch(e) {
-        //console.log( e.message ) ;
-        //console.log( yCoord , xCoord ) ;
-        //}
         ctx.putImageData( imgData, 0 , 0 ); 
         return this ;
       } ;
 
-      //this.calc = function calc() {
-        //this.populateCoordArrays() ;
-        //var lenY = toImZ.length ;
-        //var lenX = toReZ.length ;
-        //var iter = 1 ;
-        //var yCoord , xCoord , curPixel , z , modZSq ;
-        //for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
-          //for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
-            //z = [ 0 , 0 ] ;
-            //curPixel = xCoord + lenX * yCoord ;
-            //for( iter = 1 ; iter <= $opt.iter.value ; iter++ ) {
-              //z = [ z[ 0 ] * z[ 0 ] - z[ 1 ] * z[ 1 ] + toReZ[ xCoord ] , 2 * z[ 0 ] * z[ 1 ] + toImZ[ yCoord ] ] ;
-              //modZSq = z[ 0 ] * z[ 0 ] + z[ 1 ] * z[ 1 ] ;
-              //if( modZSq > maxSq ) { // iterations diverge
-                //mandelIterData[ curPixel ] = iter ;
-                //break;
-              //}
-            //}
-            //if( iter > $opt.iter.value ) { // iterations converge
-              //mandelIterData[ curPixel ] = $opt.iter.value ;
-            //}
-          //}
-        //}
-        //return this ;
-      //} ;
 
-      this.polarCalc = function polarCalc() {
-        // PREP
+      // Ye olde parametric-only algo.
+
+      this.polarCalcPrep = function() {
         this.populateCoordArrays() ;
         if( $opt.renderEngine.value === "Polar" ) {
           rotCalc = $opt.rot.value ;
-          console.log( "yup" );
         }
-        // VARS
+      } ;
+
+
+      // SINGLE THREAD CALC
+
+      this.singleThreadCalc = function() {
         var angleUpdateRad = - Math.PI * $opt.rot.value / 180 ; 
-        var lenY = toImZ.length ;
-        var lenX = toReZ.length ;
         var iter = 1 , rotTransform ;
         var yCoord , xCoord , curPixel , z , zReSq , zImSq , c ;
         var Re = 0 , Im = 1 ;
-        //  MANDELBROT ALGO
-        for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
-          for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
+        for( yCoord = 0 ; yCoord < toImZ.length ; yCoord++ ) {
+          //for( yCoord = e.yInit ; yCoord < e.yEnd ; yCoord++ ) {
+          for( xCoord = 0 ; xCoord < toReZ.length ; xCoord++ ) {
             z = [ 0 , 0 ] ;
             curPixel = ( xCoord ) + xPixWidth * ( yCoord ) ;
             if( $opt.renderEngine.value === "Polar" ) {
+              // Polar TODO: should memoize trig?
               rotTransform = angleUpdateRad + pixPolarPhi[ curPixel ] ;
-              cPixel= [
+              complexPixel= [
                 Math.round( xPixWidth / 2 + Math.cos( rotTransform ) * pixPolarMod[ curPixel ] + xRotBoundOffset ) ,
                 Math.round( yPixWidth / 2 + Math.sin( rotTransform ) * pixPolarMod[ curPixel ] + yRotBoundOffset ) ,
               ] ;
             } else {
-              cPixel = [ xCoord , yCoord ] ;
+              // Cartesian
+              complexPixel = [ xCoord , yCoord ] ;
             }
+            // MANDELBROT ALGO
             for( iter = 1 ; iter <= $opt.iter.value ; iter++ ) {
               zReSq = z[ Re ] * z[ Re ] , zImSq = z[ Im ] * z[ Im ] ;
-              z = [ zReSq - zImSq + toReZ[ cPixel[ Re ] ] , 2 * z[ Re ] * z[ Im ] + toImZ[ cPixel[ Im ] ] ] ;
+              z = [ zReSq - zImSq + toReZ[ complexPixel[ Re ] ] , 2 * z[ Re ] * z[ Im ] + toImZ[ complexPixel[ Im ] ] ] ;
               if( zReSq + zImSq > maxSq ) { // iterations diverge
                 mandelIterData[ curPixel ] = iter ;
                 break;
@@ -461,162 +438,263 @@ document.onreadystatechange = function() {
             if( iter > $opt.iter.value ) { // iterations converge
               mandelIterData[ curPixel ] = $opt.iter.value ;
             }
+            // END MANDELBROT ALGO
           }
         }
-        return this ;
-      } ;
+        mandelIterData = Uint8Array.from( ) ;
+        } ;
 
-      this.init = function() {
-        $util.consoleLog( "Init" , $util.timeExec( function() {
-          this.initCanvas() ;
-          this.initPolarCalc() ;
-          this.initCalc() ;
-        } , this ) ) ;
-        //this.initCanvas().initCalc() ;
-        this.render() ;
-        return this ;
-      } ;
+        // MULTI THREAD WORKER FUNCTION
 
-      this.render = function render() {
-        $util.consoleLog( "Calc" , $util.timeExec( this.polarCalc , this ) ) ;
-        //$util.consoleLog( "Calc" , $util.timeExec( this.calc , this ) ) ;
-        this.redraw() ;
-        return this ;
-      } ;
-
-      this.redraw = function redraw() {
-        $util.consoleLog( "Draw" , $util.timeExec( function() {
-          this.updateColorArr() ;
-          this.draw() ;
-        } , this ) ) ;
-        $util.consoleLog( "" , "ok" ) ;
-        return this ;
-      } ;
-
-      this.listen = function listen() {
-        canvas.addEventListener( "click" , function( ev ) {
-          $ctrl.mapControls() ;
-          this.updateDrawParams( ev ).render() ;
-          $ctrl.createControls().render() ;
-        }.bind( this ) ) ;
-        return this ;
-      } ;
-
-      return this ;
-
-    }.bind({}) () ) ;
-
-    var $ctrl = ( function() {
-
-      // private
-      var form = document.querySelector( "#ctrl" ) ;
-      var optionDisplay = document.querySelector( "#option-display" ) ;
-      var controls = [] ;
-      var recalcOnSubmit = false ;
-
-      // public
-      this.init = function() {
-        this.render() ;
-        return this ;
-      } ;
-
-      this.createControls = function() {
-        controls = [] ;
-
-        for( var opt in $opt ) {
-
-          switch( $opt[ opt ].type ) {
-            case( "text" ) :
-              var inputElement = document.createElement( "input" ) ;
-              inputElement.setAttribute( "type" , $opt[ opt ].type ) ;
-              inputElement.setAttribute( "value" , $opt[ opt ].value ) ;
-              inputElement.setAttribute( "name" , opt ) ;
-              break ;
-            case( "select" ) :
-              var inputElement = document.createElement( "select" ) ;
-              var options = $opt[ opt ].options ;
-              var curOption = $opt[ opt ].value ;
-              inputElement.setAttribute( "name" , opt ) ;
-              for( var o in options ) {
-                var curOpt = document.createElement( "option" ) ;
-                curOpt.setAttribute( "value" , o ) ;
-                if( o === curOption ) curOpt.setAttribute( "selected" , "" ) ;
-                curOpt.innerHTML = o ;
-                inputElement.appendChild( curOpt ) ;
+        this.workerCalc = function( e ) {
+          var d = JSON.parse( e.data ) ;
+          var xInit         = d[ "xInit" ] ;
+          var xPixWidth     = d[ "xPixWidth" ] ;
+          var yInit         = d[ "yInit" ] ;
+          var yPixWidth     = d[ "yPixWidth" ] ;
+          var newAngle      = d[ "newAngle" ] ;
+          var renderEngine  = d[ "renderEngine" ] ;
+          var iterVal       = d[ "iterVal" ] ;
+          var toReZ         = d[ "toReZ" ] ;
+          var toImZ         = d[ "toImZ" ] ;
+          var maxSq         = d[ "maxSq" ] ;
+          var mandelIterData = new Uint8ClampedArray( xPixWidth * yPixWidth ) ;
+          var angleUpdateRad = - Math.PI * newAngle / 180 ; 
+          var iter = 1 , rotTransform ;
+          var yCoord , xCoord , curPixel , z , zReSq , zImSq , c ;
+          var Re = 0 , Im = 1 ;
+          //for( yCoord = 0 ; yCoord < lenY ; yCoord++ ) {
+          for( yCoord = yInit ; yCoord < yPixWidth ; yCoord++ ) {
+            for( xCoord = xInit ; xCoord < xPixWidth ; xCoord++ ) {
+              z = [ 0 , 0 ] ;
+              curPixel = xCoord + xPixWidth * yCoord ;
+              //if( renderEngine === "Polar" ) {
+              //// Polar TODO: should memoize trig?
+              //rotTransform = angleUpdateRad + pixPolarPhi[ curPixel ] ;
+              //complexPixel= [
+              //Math.round( xPixWidth / 2 + Math.cos( rotTransform ) * pixPolarMod[ curPixel ] + xRotBoundOffset ) ,
+              //Math.round( yPixWidth / 2 + Math.sin( rotTransform ) * pixPolarMod[ curPixel ] + yRotBoundOffset ) ,
+              //] ;
+              //} else {
+              // Cartesian
+              complexPixel = [ xCoord , yCoord ] ;
+              //}
+              // MANDELBROT ALGO
+              for( iter = 1 ; iter <= iterVal; iter++ ) {
+                zReSq = z[ Re ] * z[ Re ] , zImSq = z[ Im ] * z[ Im ] ;
+                z = [ zReSq - zImSq + toReZ[ complexPixel[ Re ] ] , 2 * z[ Re ] * z[ Im ] + toImZ[ complexPixel[ Im ] ] ] ;
+                if( zReSq + zImSq > maxSq ) { // iterations diverge
+                  mandelIterData[ curPixel ] = iter ;
+                  break;
+                }
               }
-          }
-
-          var container = document.createElement( "div" ) ;
-          var label = document.createElement( "div" ) ;
-          var txt = document.createTextNode( $opt[ opt ].labelText ) ;
-
-
-          container   .setAttribute( "id"    ,   opt                  ) ;
-          label       .setAttribute( "class" ,  "control-input label" ) ;
-          inputElement.setAttribute( "class" ,  "control-input field" ) ;
-
-          container   .appendChild( inputElement  ) ;
-          label       .appendChild( txt           ) ;
-          container   .appendChild( label         ) ;
-
-          if( $opt[ opt ].beta ) {
-            var beta = document.createElement( "div" ) ;
-            var betaTxt = document.createTextNode( "beta" ) ;
-            beta.setAttribute( "class" , "control-input beta" ) ;
-            beta.appendChild( betaTxt ) ;
-            container .appendChild( beta ) ;
-          }
-
-          controls    .push( container ) ;
-        }
-        return this ;
-      } ;
-
-      this.mapControls = function() {
-        for( var opt in $opt ) {
-          if( form.hasOwnProperty( opt ) ) {
-            var curOpt = form.elements[ opt ].value ;
-            curOpt = isNaN( parseFloat( curOpt ) ) ? curOpt : parseFloat( curOpt ) ;
-            if( $opt[ opt ].value !== curOpt ) {
-              recalcOnSubmit += $opt[ opt ].recalcNeeded ;
-              $opt[ opt ].value = curOpt ;
+              if( iter > iterVal ) { // iterations converge
+                mandelIterData[ curPixel ] = iterVal ;
+              }
+              // END MANDELBROT ALGO
             }
           }
+          self.postMessage( mandelIterData ) ;
         }
-        return this ;
-      } ;
 
-      this.listen = function() {
-        form.addEventListener( "submit" , function( ev ) {
-          ev.preventDefault() ;
-          recalcOnSubmit = 0 ;
-          this.mapControls() ;
-          if( recalcOnSubmit !== 0 ) {
-            $frac.updateDrawParams().init() ;
+        this.multiThreadCalc = function() {
+          var workerFunc = "onmessage=" + this.workerCalc.toString() ;
+          var workerBlob = new Blob( [ workerFunc ] ) ;
+          var blobURL = window.URL.createObjectURL( workerBlob ) ;
+          var data = {
+            "xInit"         : 0 ,
+            "xPixWidth"     : toReZ.length ,
+            "yInit"         : 0 ,
+            "yPixWidth"     : toImZ.length ,
+            "newAngle"      : $opt.rot.value ,
+            "renderEngine"  : $opt.renderEngine.value ,
+            "iterVal"       : $opt.iter.value ,
+            "toReZ"         : toReZ ,
+            "toImZ"         : toImZ ,
+            "maxSq"         : maxSq ,
+          } ;
+          window.$mBrotWorkers = [] ;
+          $mBrotWorkers[ 0 ] = new Worker( blobURL ) ;
+          var that = this ;
+          $mBrotWorkers[ 0 ].onmessage = function( e ) { 
+            mandelIterData = Uint8Array.from( e.data ) ;
+            that.redraw() ;
+          } ;
+          $mBrotWorkers[ 0 ].postMessage( JSON.stringify( data ) ) ;
+        } ;
+
+        // Ye new & improved polar-enabled algo
+        // Now with multithread!!
+
+        this.polarCalc = function polarCalc() {
+          this.polarCalcPrep() ;
+          if( this.hasWorkers() ) {
+            $util.consoleLog( "Worker support" , "Yes" ) ;
+            $util.consoleLog( "Threads" , this.maxThreads() ) ;
+            this.multiThreadCalc() ;
           } else {
-            $frac.redraw() ;
+            $util.consoleLog( "Worker support" , "No" ) ;
+            $util.consoleLog( "Threads" , "1" ) ;
+            this.singleThreadCalc() ;
           }
-        }.bind( this ) ) ;
+          return this ;
+        } ;
+
+        // API
+        this.init = function() {
+          $util.consoleLog( "Init" , $util.timeExec( function() {
+            this.initCanvas() ;
+            if( $opt.renderEngine.value === "Polar" ) {
+              this.initPolarCalc() ;
+            }
+            this.initCalc() ;
+          } , this ) ) ;
+          this.render() ;
+          return this ;
+        } ;
+
+        this.render = function render() {
+          $util.consoleLog( "Calc" , $util.timeExec( this.polarCalc , this ) ) ;
+          //this.redraw() ;
+          return this ;
+        } ;
+
+        this.redraw = function redraw() {
+          $util.consoleLog( "Draw" , $util.timeExec( function() {
+            this.updateColorArr() ;
+            this.draw( 0 , yPixWidth ) ;
+          } , this ) ) ;
+          $util.consoleLog( "" , "ok" ) ;
+          return this ;
+        } ;
+
+        this.listen = function listen() {
+          canvas.addEventListener( "click" , function( ev ) {
+            $ctrl.mapControls() ;
+            this.updateDrawParams( ev ).render() ;
+            $ctrl.createControls().render() ;
+          }.bind( this ) ) ;
+          return this ;
+        } ;
+
         return this ;
-      } ;
 
-      this.render = function() {
-        //TODO improve this
-        this.createControls() ;
-        optionDisplay.innerHTML = "" ;
-        controls.forEach( function( el ) {
-          optionDisplay.appendChild( el ) ;
-        } ) ; 
-        return this;
-      } ;
+        }.bind({}) () ) ;
 
-      return this ;
+        var $ctrl = ( function() {
 
-    }.bind({}) () ) ; 
+          // private
+          var form = document.querySelector( "#ctrl" ) ;
+          var optionDisplay = document.querySelector( "#option-display" ) ;
+          var controls = [] ;
+          var recalcOnSubmit = false ;
 
-    // Let's Roll!
-    $frac.init().listen() ;
-    $ctrl.init().listen() ;
+          // public
+          this.init = function() {
+            this.render() ;
+            return this ;
+          } ;
 
-  }
-}
+          this.createControls = function() {
+            controls = [] ;
+
+            for( var opt in $opt ) {
+
+              switch( $opt[ opt ].type ) {
+                case( "text" ) :
+                  var inputElement = document.createElement( "input" ) ;
+                  inputElement.setAttribute( "type" , $opt[ opt ].type ) ;
+                  inputElement.setAttribute( "value" , $opt[ opt ].value ) ;
+                  inputElement.setAttribute( "name" , opt ) ;
+                  break ;
+                case( "select" ) :
+                  var inputElement = document.createElement( "select" ) ;
+                  var dropDownOpts = $opt[ opt ].options ;
+                  var curOption = $opt[ opt ].value ;
+                  inputElement.setAttribute( "name" , opt ) ;
+                  for( var dropDownO in dropDownOpts ) {
+                    var curOpt = document.createElement( "option" ) ;
+                    curOpt.setAttribute( "value" , dropDownO ) ;
+                    if( dropDownO === curOption ) curOpt.setAttribute( "selected" , "" ) ;
+                    curOpt.innerHTML = dropDownO ;
+                    inputElement.appendChild( curOpt ) ;
+                  }
+              }
+
+              var container = document.createElement( "div" ) ;
+              var label = document.createElement( "div" ) ;
+              var txt = document.createTextNode( $opt[ opt ].labelText ) ;
+
+
+              container   .setAttribute( "id"    ,   opt                  ) ;
+              label       .setAttribute( "class" ,  "control-input label" ) ;
+              inputElement.setAttribute( "class" ,  "control-input field" ) ;
+
+              container   .appendChild( inputElement  ) ;
+              label       .appendChild( txt           ) ;
+              container   .appendChild( label         ) ;
+
+              if( $opt[ opt ].beta ) {
+                var beta = document.createElement( "div" ) ;
+                var betaTxt = document.createTextNode( "beta" ) ;
+                beta.setAttribute( "class" , "control-input beta" ) ;
+                beta.appendChild( betaTxt ) ;
+                container .appendChild( beta ) ;
+              }
+
+              controls    .push( container ) ;
+            }
+            return this ;
+          } ;
+
+          this.mapControls = function() {
+            for( var opt in $opt ) {
+              if( form.hasOwnProperty( opt ) ) {
+                var curOpt = form.elements[ opt ].value ;
+                curOpt = isNaN( parseFloat( curOpt ) ) ? curOpt : parseFloat( curOpt ) ;
+                if( $opt[ opt ].value !== curOpt ) {
+                  recalcOnSubmit += $opt[ opt ].recalcNeeded ;
+                  $opt[ opt ].value = curOpt ;
+                }
+              }
+            }
+            return this ;
+          } ;
+
+          this.listen = function() {
+            form.addEventListener( "submit" , function( ev ) {
+              ev.preventDefault() ;
+              recalcOnSubmit = 0 ;
+              this.mapControls() ;
+              if( recalcOnSubmit !== 0 ) {
+                $frac.updateDrawParams().init() ;
+              } else {
+                $frac.redraw() ;
+              }
+            }.bind( this ) ) ;
+            return this ;
+          } ;
+
+          this.render = function() {
+            //TODO improve this
+            this.createControls() ;
+            optionDisplay.innerHTML = "" ;
+            controls.forEach( function( el ) {
+              optionDisplay.appendChild( el ) ;
+            } ) ; 
+            return this;
+          } ;
+
+          return this ;
+
+        }.bind({}) () ) ; 
+
+        function main() {
+          $frac.init().listen() ;
+          $ctrl.init().listen() ;
+        }
+
+        // Let's Roll!
+        main() ;
+      }
+    }
