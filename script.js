@@ -157,7 +157,7 @@ document.onreadystatechange = function() {
       // FRACTAL ALGO VARS
       var zoom = 1 ;
       var maxSq = $opt.max.value * $opt.max.value ;
-      var mandelIterData ;
+      //var mandelIterData ;
       var mThreadData = [] ;
 
       var getZoom = function() { return zoom ; }
@@ -187,6 +187,16 @@ document.onreadystatechange = function() {
       var colorRGB = [] ;
       var R = 0 , G = 1 , B = 2 ;
 
+      // MULTITHREADING HELPERS. TODO: REFACTOR
+      var threadCount = 0 ;
+      this.hasWorkers = function() { return !! window.Worker ; } ;
+      this.maxThreads = function() { return !! navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 1 ; } ;
+      this.increaseDoneThreadCount = function() { threadCount += 1 ; } ;
+      this.allThreadsDone = function() { return threadCount === $opt.multiThread.options[ $opt.multiThread.value ] ; } ;
+      this.resetThreadCount = function() { threadCount = 0 ; } ;
+      var $mBrotWorkers = [] ;
+
+
       // INIT
       this.initCanvas = function() {
         if( xPixWidth !== window.innerWidth || yPixWidth !== window.innerHeight ) {
@@ -209,17 +219,9 @@ document.onreadystatechange = function() {
         return this ;
       } ;
 
-      this.hasWorkers = function() { return !! window.Worker ; } ;
-
-      this.maxThreads = function() { return !! navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 1 ; } ;
-      var threadCount = 0 ;
-      this.upThreadCount = function() { threadCount += 1 ; } ;
-      this.getThreadCount = function() { return threadCount ; } ;
-      this.resetThreadCount = function() { threadCount = 0 ; } ;
-
-
       this.initCalc = function() {
-        mandelIterData = new Uint8ClampedArray( ( xPixWidth + xRotBoundExtension ) * ( yPixWidth + yRotBoundExtension ) ) ;
+        //mandelIterData = new Uint8ClampedArray( ( xPixWidth + xRotBoundExtension ) * ( yPixWidth + yRotBoundExtension ) ) ;
+        mThreadData.push( new Uint8ClampedArray( ( xPixWidth + xRotBoundExtension ) * ( yPixWidth + yRotBoundExtension ) ) ) ;
         return this ;
       } ;
 
@@ -306,8 +308,8 @@ document.onreadystatechange = function() {
         var xPixWidthRot = xPixWidth + xRotBoundExtension ;
         //pixPolarMod = new Float32Array( xPixWidthRot * yPixWidthRot ) ;
         //pixPolarPhi = new Float32Array( xPixWidthRot * yPixWidthRot ) ;
-        pixPolarMod = new Uint8Array( xPixWidthRot * yPixWidthRot ) ;
-        pixPolarPhi = new Uint8Array( xPixWidthRot * yPixWidthRot ) ;
+        pixPolarMod = new Float32Array( xPixWidthRot * yPixWidthRot ) ;
+        pixPolarPhi = new Float32Array( xPixWidthRot * yPixWidthRot ) ;
         for( var yCoord = yRotBoundOffset , offsetYCenter = yRotBoundOffset + Math.round( yPixWidth / 2 ) ; yCoord < yPixWidthRot ; yCoord++ ) {
           for( var xCoord = xRotBoundOffset , offsetXCenter = xRotBoundOffset + Math.round( xPixWidth / 2 ) ; xCoord < xPixWidthRot ; xCoord++ ) {
             offsetXCoord  = xCoord - offsetXCenter ;
@@ -393,33 +395,24 @@ document.onreadystatechange = function() {
         //yRotBoundOffset = Math.round( deltaPixHeigth + 1 );
       } ;
 
-      this.draw = function draw( yStart , yEnd , id ) {
-        var lenX = toReZ.length , xCoord , yCoord , curPixel , curPixRotOffset , RGBAPixOffset ;
-        try {
-          for( yCoord = 0 ; yCoord < ( yEnd - yStart ) ; yCoord++ ) {
-            for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
-              curPixRotOffset = ( xCoord + xRotBoundOffset ) + ( yCoord + yRotBoundOffset ) * xPixWidth ;
-              curPixel = xCoord + yCoord * xPixWidth ;
-              RGBAPixOffset = curPixel * 4 ;
-              imgData.data[ RGBAPixOffset     ] = colorRGB[ mandelIterData[ curPixRotOffset ] ][ R ] ;
-              imgData.data[ RGBAPixOffset + 1 ] = colorRGB[ mandelIterData[ curPixRotOffset ] ][ G ] ;
-              imgData.data[ RGBAPixOffset + 2 ] = colorRGB[ mandelIterData[ curPixRotOffset ] ][ B ] ;
-              imgData.data[ RGBAPixOffset + 3 ] = 255 ; // alpha
-            }
-          }
-        } catch( e ) {
-          console.log( "--- EXCEPTION ---" , "Thread " + ( id || "N/A" ) ) ;
-          console.log( e.message ) ;
-          console.log( "Reached coordinates (x,y) " , xCoord , yCoord , "on" , yEnd , lenX ) ;
-          console.log( curPixRotOffset ) ;
-          console.log( "--- END EXCEPTION ---" ) ;
-        }
-        //console.log( "drawing between: " , yStart , yEnd ) ;
-        ctx.putImageData( imgData, 0 , yStart ); 
-        return this ;
-      } ;
+      //this.draw = function draw( yStart , yEnd , id ) {
+        //var lenX = toReZ.length , xCoord , yCoord , curPixel , curPixRotOffset , RGBAPixOffset ;
+        //for( yCoord = 0 ; yCoord < ( yEnd - yStart ) ; yCoord++ ) {
+          //for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
+            //curPixRotOffset = ( xCoord + xRotBoundOffset ) + ( yCoord + yRotBoundOffset ) * xPixWidth ;
+            //curPixel = xCoord + yCoord * xPixWidth ;
+            //RGBAPixOffset = curPixel * 4 ;
+            //imgData.data[ RGBAPixOffset     ] = colorRGB[ mandelIterData[ curPixRotOffset ] ][ R ] ;
+            //imgData.data[ RGBAPixOffset + 1 ] = colorRGB[ mandelIterData[ curPixRotOffset ] ][ G ] ;
+            //imgData.data[ RGBAPixOffset + 2 ] = colorRGB[ mandelIterData[ curPixRotOffset ] ][ B ] ;
+            //imgData.data[ RGBAPixOffset + 3 ] = 255 ; // alpha
+          //}
+        //}
+        //ctx.putImageData( imgData, 0 , yStart ); 
+        //return this ;
+      //} ;
 
-      this.threadDraw = function threadDraw() {
+      this.draw = function draw() {
         var threadIndex , threadData , threadDataLength;
         var numThreads = mThreadData.length ;
         for( threadIndex = 0 ; threadIndex < numThreads ; threadIndex += 1 ) {
@@ -433,7 +426,7 @@ document.onreadystatechange = function() {
             imgData.data[ RGBAPixOffset + 3 ] = 255 ; // alpha
           }
         }
-        //mThreadData = [] ;
+        mThreadData = [] ;
         ctx.putImageData( imgData, 0 , 0 ); 
         return this ;
       } ;
@@ -452,6 +445,7 @@ document.onreadystatechange = function() {
         var iter = 1 , rotTransform ;
         var yCoord , xCoord , curPixel , z , zReSq , zImSq , c ;
         var Re = 0 , Im = 1 ;
+        console.log( mThreadData ) ;
         for( yCoord = 0 ; yCoord < toImZ.length ; yCoord++ ) {
           //for( yCoord = e.yInit ; yCoord < e.yEnd ; yCoord++ ) {
           for( xCoord = 0 ; xCoord < toReZ.length ; xCoord++ ) {
@@ -473,12 +467,13 @@ document.onreadystatechange = function() {
               zReSq = z[ Re ] * z[ Re ] , zImSq = z[ Im ] * z[ Im ] ;
               z = [ zReSq - zImSq + toReZ[ complexPixel[ Re ] ] , 2 * z[ Re ] * z[ Im ] + toImZ[ complexPixel[ Im ] ] ] ;
               if( zReSq + zImSq > maxSq ) { // iterations diverge
-                mandelIterData[ curPixel ] = iter ;
+                //mandelIterData[ curPixel ] = iter ;
+                mThreadData[ 0 ][ curPixel ] = iter ;
                 break ;
               }
             }
             if( iter > $opt.iter.value ) { // iterations converge
-              mandelIterData[ curPixel ] = $opt.iter.value ;
+              mThreadData[ 0 ][ curPixel ] = $opt.iter.value ;
             }
             // END MANDELBROT ALGO
           }
@@ -490,104 +485,74 @@ document.onreadystatechange = function() {
         // MULTI THREAD WORKER FUNCTION
 
         this.workerCalc = function( workerData ) {
-          //console.log( workerData , id ) ;
           var d = workerData.data ;
-          //var xStart          = d[ "xStart" ] ;
-          var xw = d[ "toReZ" ].length ;
-          //var xRotBoundOffset = d[ "xRotBoundOffset" ] ;
-          var ys = d[ "yStart" ]   ;
-          var ye = d[ "yEnd" ]     ;
-          //var yRotBoundOffset = d[ "yRotBoundOffset" ] ;
-          //var renderEngine    = d[ "renderEngine" ] ;
-          //var newAngle        = d[ "newAngle" ] ;
+          var id = typeof id === "undefined" ? d[ "workerID" ] : id ;
+          var re = d[ "toReZ" ] ;
+          var im = d[ "toImZ" ] ;
           var iv = d[ "iterVal" ]  ;
           var ms = d[ "maxSq" ]    ;
-          var re = d[ "toReZ" ]    ;
-          var im = d[ "toImZ" ]    ;
-          var id = d[ "workerID" ] ;
-          //var pixPolarMod     = d[ "pixPolarMod" ] ;
-          //var pixPolarPhi     = d[ "pixPolarPhi" ] ;
-
-          var yw = ye - ys ;
-
+          var xw = re.length ;
+          var yw = im.length ;
           var md = new Uint8ClampedArray( xw * yw ) ;
-          //var angleUpdateRad = - Math.PI * newAngle / 180 ; 
           var i = 1 ;
-          var y , x , p , z , r2 , i2 , c ;
+          var p = 0 , x = 0 , y = 0 ;
+          var r2 = 0 , i2 = 0 ;
+          var c = [ 0 , 0 ] ;
+
           // Mandelbrot Algo
-          for(y=0;y<yw;y=y+1){for(x=0;x<xw;x=x+1){z=[0,0],p=x+xw*y,c=[x,y+ys];for(i=1;i<=iv;i=i+1){r2=z[0]*z[0],i2=z[1]*z[1],z=[r2-i2+re[c[0]],2*z[0]*z[1]+im[c[1]]];if(r2+i2>ms){md[p]=i;break;}}if(i>iv)md[p]=iv;}}
+          for(y=0;y<yw;y=y+1){for(x=0;x<xw;x=x+1){z=[0,0],p=x+xw*y,c=[x,y];for(i=1;i<=iv;i=i+1){r2=z[0]*z[0],i2=z[1]*z[1],z=[r2-i2+re[c[0]],2*z[0]*z[1]+im[c[1]]];if(r2+i2>ms){md[p]=i;break;}}if(i>iv)md[p]=iv;}}
           this.postMessage( { "mandelIterData" : md , "id" : id } );
-          // TODO: check memory cleanup
-          md = undefined ;
+          //close() ;
         }
 
         //console.log( md.length ) ;
         //console.log( xw * (ye-ys)) ;
 
-        this.multiThreadCalc = function( yStart , yEnd , workerID ) {
+        this.initThread = function( yStart , yEnd , workerID ) {
           var workerFunc = "onmessage=" + this.workerCalc.toString() ;
           var workerBlob = new Blob( [ workerFunc ] ) ;
           var blobURL = window.URL.createObjectURL( workerBlob ) ;
-          //var yPixWidthRot = yPixWidth + yRotBoundExtension ;
-          //var xPixWidthRot = xPixWidth + xRotBoundExtension ;
           var workerData = {
-            "yStart"          : yStart ,
-            "yEnd"            : yEnd ,
-            //"newAngle"        : $opt.rot.value ,
-            //"renderEngine"    : $opt.renderEngine.value ,
-            "iterVal"         : $opt.iter.value ,
-            "toReZ"           : toReZ ,
-            "toImZ"           : toImZ ,
-            "maxSq"           : maxSq ,
-            "workerID"        : workerID ,
-            //"pixPolarMod"     : pixPolarMod ,
-            //"pixPolarPhi"     : pixPolarPhi ,
-            //"xRotBoundOffset" : xRotBoundOffset ,
-            //"yRotBoundOffset" : yRotBoundOffset ,
-            //"xPixWidthRot"    : xPixWidthRot ,
-            //"yPixWidthRot"    : yPixWidthRot ,
-          } ;
-          //console.log( "Data before calling" ) ;
-          //console.log( data ) ;
-          $mBrotWorkers.push( new Worker( blobURL ) ) ;
-          $mBrotWorkers[ $mBrotWorkers.length - 1 ].onmessage = function( e ) { 
-            //console.log( e.data ) ;
-            var totalThreads = $opt.multiThread.options[ $opt.multiThread.value ] ;
-            //mThreadData.push( { "data" : Uint8Array.from( e.data.mandelIterData ) , "id" : e.data.id } ) ;
-            mThreadData[ e.data.id ] = Uint8Array.from( e.data.mandelIterData ) ;
-            this.upThreadCount() ;
-            if( this.getThreadCount() === totalThreads ) {
-              //console.log( "Done!" ) ;
-              //console.log( mThreadData[0] ) ;
-              this.redraw( yStart , yEnd , e.data.id) ;
-              //mandelIterData = mThreadData.reduce( function( acc , el ) { return acc.concat( el ) ;} , [] ) ;
-              mThreadData = [] ;
-              this.resetThreadCount() ;
-              $util.consoleLog( "Done" , Math.round( performance.now() - start ) + " ms" ) ;
-            } ;
-            //mThreadData[ e.data.id ] = Uint8Array.from( e.data.mandelIterData ) ;
-            //$util.consoleLog( "Thread " + e.data.id + " done" , Math.round( performance.now() - start ) + " ms" ) ;
-            //console.log( "mandelIterData.length" , mandelIterData.length ) ;
-            //console.log( "toReZ.length * toImZ.length" , toReZ.length * toImZ.length ) ;
-            //console.log( "yStart , yEnd" , yStart , yEnd ) ;
-            //console.log( yStart , yEnd ) ;
-          }.bind( this ) ;
-          var start = performance.now() ;
-          $mBrotWorkers[ $mBrotWorkers.length - 1 ].postMessage( workerData ) ;
+            "yStart"     : yStart ,
+            "yEnd"       : yEnd ,
+            "iterVal"    : $opt.iter.value ,
+            "maxSq"      : maxSq ,
+            "toReZ"      : toReZ ,
+            "toImZ"      : toImZ.subarray( yStart , yEnd ) ,
+            "workerID"   : workerID ,
+          }
+
+          if( typeof( $mBrotWorkers[ workerID] ) === "undefined" ) {
+            $mBrotWorkers[ workerID ] = new Worker( blobURL ) ;
+            $mBrotWorkers[ workerID ].onmessage = function( e ) { 
+              mThreadData[ e.data.id ] = Uint8Array.from( e.data.mandelIterData ) ;
+              this.increaseDoneThreadCount() ;
+              if( this.allThreadsDone() ) {
+                this.redraw() ;
+                //mThreadData = [] ;
+                this.resetThreadCount() ;
+                $util.consoleLog( "Done" , Math.round( performance.now() - window.$mBrotPerfStart ) + " ms" ) ;
+              } ;
+            }.bind( this ) ;
+          }
+          // TODO: improve this
+          window.$mBrotPerfStart = performance.now() ;
+          $mBrotWorkers[ workerID ].postMessage( workerData ) ;
         } ;
 
         this.polarCalc = function polarCalc() {
           this.polarCalcPrep() ;
           var threads = $opt.multiThread.options[ $opt.multiThread.value ];
           if( this.hasWorkers() && $opt.multiThread.value !== "One" ) {
-            var yThreadWidth = Math.ceil( yPixWidth / threads ) ;
-            window.$mBrotWorkers = [] ;
+            var yThreadWidth = Math.floor( yPixWidth / threads ) ;
+            var lastThreadDelta = yPixWidth - yThreadWidth * threads ;
             for( var t = 0 ; t < threads  ; t++ ) {
               var yStart = t * yThreadWidth ;
               var yEnd  = yStart + yThreadWidth ;
-              this.multiThreadCalc( yStart , yEnd , t ) ;
+              this.initThread( yStart , yEnd , t ) ;
             }
           } else {
+            this.initCalc() ;
             $util.consoleLog( "Render" , $util.timeExec( this.singleThreadCalc , this ) ) ;
           }
           return this ;
@@ -623,8 +588,7 @@ document.onreadystatechange = function() {
           yStart = yStart || 0 ;
           yEnd = yEnd || yPixWidth ;
           this.updateColorLevelArr() ;
-          //this.draw( yStart , yEnd , id ) ;
-          this.threadDraw() ;
+          this.draw() ;
           //} , this ) ) ;
           //$util.consoleLog( "Zoom level" , getZoom() , $frac ) ;
           return this ;
