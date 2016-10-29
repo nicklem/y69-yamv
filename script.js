@@ -9,10 +9,8 @@
  */
 
 // TODO:
-// REFACTOR FOR GODS SAKE
 // display coord bounds and save coord history vector
 // antialiasing
-// web worker multithread
 // image export
 // mobile styles
 // verify redraw on resize not properly recalculating bounds
@@ -77,7 +75,7 @@ document.onreadystatechange = function() {
         "recalcNeeded": YES ,
       } ,
       this.multiThread = {
-        "value" : "One" ,
+        "value" : "Two" ,
         "labelText" : "Cores" ,
         "type"  : "select" ,
         "options": { "One" : 1 , "Two" : 2 , "Four" : 4 , "Eight" : 8 } ,
@@ -160,6 +158,7 @@ document.onreadystatechange = function() {
       var zoom = 1 ;
       var maxSq = $opt.max.value * $opt.max.value ;
       var mandelIterData ;
+      var mThreadData = [] ;
 
       var getZoom = function() { return zoom ; }
 
@@ -213,6 +212,11 @@ document.onreadystatechange = function() {
       this.hasWorkers = function() { return !! window.Worker ; } ;
 
       this.maxThreads = function() { return !! navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 1 ; } ;
+      var threadCount = 0 ;
+      this.upThreadCount = function() { threadCount += 1 ; } ;
+      this.getThreadCount = function() { return threadCount ; } ;
+      this.resetThreadCount = function() { threadCount = 0 ; } ;
+
 
       this.initCalc = function() {
         mandelIterData = new Uint8ClampedArray( ( xPixWidth + xRotBoundExtension ) * ( yPixWidth + yRotBoundExtension ) ) ;
@@ -287,7 +291,8 @@ document.onreadystatechange = function() {
       } ;
 
       this.populateCoordArrays = function populateCoordArrays() {
-        toReZ = [] ; toImZ = [] ;
+        toReZ = new Float64Array( xPixWidth + xRotBoundExtension ) ;
+        toImZ = new Float64Array( yPixWidth + yRotBoundExtension ) ;
         var deltaX = ( xMax - xMin ) / xPixWidth ,
         deltaY = ( yMax - yMin ) / yPixWidth ;
         for( i = 0 ; i < ( xPixWidth + xRotBoundExtension ) ; i++ ) { toReZ[i] = xMin + ( deltaX * ( i - xRotBoundOffset ) ) ; }
@@ -299,10 +304,10 @@ document.onreadystatechange = function() {
         var curPixel , offsetXCoord , offsetYCoord ;
         var yPixWidthRot = yPixWidth + yRotBoundExtension ;
         var xPixWidthRot = xPixWidth + xRotBoundExtension ;
-        pixPolarMod = [];
-        pixPolarPhi = [];
         //pixPolarMod = new Float32Array( xPixWidthRot * yPixWidthRot ) ;
         //pixPolarPhi = new Float32Array( xPixWidthRot * yPixWidthRot ) ;
+        pixPolarMod = new Uint8Array( xPixWidthRot * yPixWidthRot ) ;
+        pixPolarPhi = new Uint8Array( xPixWidthRot * yPixWidthRot ) ;
         for( var yCoord = yRotBoundOffset , offsetYCenter = yRotBoundOffset + Math.round( yPixWidth / 2 ) ; yCoord < yPixWidthRot ; yCoord++ ) {
           for( var xCoord = xRotBoundOffset , offsetXCenter = xRotBoundOffset + Math.round( xPixWidth / 2 ) ; xCoord < xPixWidthRot ; xCoord++ ) {
             offsetXCoord  = xCoord - offsetXCenter ;
@@ -388,12 +393,10 @@ document.onreadystatechange = function() {
         //yRotBoundOffset = Math.round( deltaPixHeigth + 1 );
       } ;
 
-      this.draw = function draw( yStart , yEnd ) {
-        var lenY = toImZ.length , lenX = toReZ.length ,
-        xCoord , yCoord ,
-        curPixel , curPixRotOffset , RGBAPixOffset ;
+      this.draw = function draw( yStart , yEnd , id ) {
+        var lenX = toReZ.length , xCoord , yCoord , curPixel , curPixRotOffset , RGBAPixOffset ;
         try {
-          for( yCoord = yStart ; yCoord < yEnd ; yCoord++ ) {
+          for( yCoord = 0 ; yCoord < ( yEnd - yStart ) ; yCoord++ ) {
             for( xCoord = 0 ; xCoord < lenX ; xCoord++ ) {
               curPixRotOffset = ( xCoord + xRotBoundOffset ) + ( yCoord + yRotBoundOffset ) * xPixWidth ;
               curPixel = xCoord + yCoord * xPixWidth ;
@@ -405,12 +408,32 @@ document.onreadystatechange = function() {
             }
           }
         } catch( e ) {
-          console.log( "--- EXCEPTION ---" ) ;
+          console.log( "--- EXCEPTION ---" , "Thread " + ( id || "N/A" ) ) ;
           console.log( e.message ) ;
-          console.log( "Reached coordinates (x,y) " , xCoord , yCoord )
+          console.log( "Reached coordinates (x,y) " , xCoord , yCoord , "on" , yEnd , lenX ) ;
+          console.log( curPixRotOffset ) ;
           console.log( "--- END EXCEPTION ---" ) ;
         }
         //console.log( "drawing between: " , yStart , yEnd ) ;
+        ctx.putImageData( imgData, 0 , yStart ); 
+        return this ;
+      } ;
+
+      this.threadDraw = function threadDraw() {
+        var threadIndex , threadData , threadDataLength;
+        var numThreads = mThreadData.length ;
+        for( threadIndex = 0 ; threadIndex < numThreads ; threadIndex += 1 ) {
+          threadDataEl = mThreadData[ threadIndex ] ;
+          threadDataLength = threadDataEl.length ;
+          for( p = 0 ; p < threadDataLength ; p+=1 ) {
+            RGBAPixOffset = ( threadDataLength * threadIndex + p ) * 4 ;
+            imgData.data[ RGBAPixOffset     ] = colorRGB[ threadDataEl[ p ] ][ R ] ;
+            imgData.data[ RGBAPixOffset + 1 ] = colorRGB[ threadDataEl[ p ] ][ G ] ;
+            imgData.data[ RGBAPixOffset + 2 ] = colorRGB[ threadDataEl[ p ] ][ B ] ;
+            imgData.data[ RGBAPixOffset + 3 ] = 255 ; // alpha
+          }
+        }
+        //mThreadData = [] ;
         ctx.putImageData( imgData, 0 , 0 ); 
         return this ;
       } ;
@@ -421,7 +444,6 @@ document.onreadystatechange = function() {
           rotCalc = $opt.rot.value ;
         }
       } ;
-
 
       // SINGLE THREAD CALC
 
@@ -463,97 +485,61 @@ document.onreadystatechange = function() {
         }
         // TODO: THIS SHOULDN"T BE HERE
         this.redraw();
-      } ;
+        } ;
 
         // MULTI THREAD WORKER FUNCTION
 
-        this.workerCalc = function( e ) {
-          var d = JSON.parse( e.data ) ;
+        this.workerCalc = function( workerData ) {
+          //console.log( workerData , id ) ;
+          var d = workerData.data ;
           //var xStart          = d[ "xStart" ] ;
-          var xPixWidth       = d[ "xPixWidth" ] ;
-          //var xPixWidthRot    = d[ "xPixWidthRot" ] ;
+          var xw = d[ "toReZ" ].length ;
           //var xRotBoundOffset = d[ "xRotBoundOffset" ] ;
-          var yStart          = d[ "yStart" ] ;
-          var yPixWidth       = d[ "yPixWidth" ] ;
-          //var yPixWidthRot    = d[ "yPixWidthRot" ] ;
+          var ys = d[ "yStart" ]   ;
+          var ye = d[ "yEnd" ]     ;
           //var yRotBoundOffset = d[ "yRotBoundOffset" ] ;
-          var renderEngine    = d[ "renderEngine" ] ;
-          var newAngle        = d[ "newAngle" ] ;
-          var iterVal         = d[ "iterVal" ] ;
-          var maxSq           = d[ "maxSq" ] ;
-          var toReZ           = d[ "toReZ" ] ;
-          var toImZ           = d[ "toImZ" ] ;
+          //var renderEngine    = d[ "renderEngine" ] ;
+          //var newAngle        = d[ "newAngle" ] ;
+          var iv = d[ "iterVal" ]  ;
+          var ms = d[ "maxSq" ]    ;
+          var re = d[ "toReZ" ]    ;
+          var im = d[ "toImZ" ]    ;
+          var id = d[ "workerID" ] ;
           //var pixPolarMod     = d[ "pixPolarMod" ] ;
           //var pixPolarPhi     = d[ "pixPolarPhi" ] ;
-          //console.log( d ) ;
-          //console.log( pixPolarMod.length ) ;
-          //debugger;
 
-          var mandelIterData = new Uint8ClampedArray( xPixWidth * yPixWidth ) ;
-          var angleUpdateRad = - Math.PI * newAngle / 180 ; 
-          var iter = 1 , rotTransform , pixPolarMod , pixPolarPhi ;
-          var yCoord , xCoord , curPixel , z , zReSq , zImSq , c ;
-          var Re = 0 , Im = 1 ;
+          var yw = ye - ys ;
 
-          // THE LOOP
-          for( yCoord = yStart ; yCoord < yPixWidth ; yCoord++ ) {
-            //for( yCoord = e.yInit ; yCoord < e.yEnd ; yCoord++ ) {
-            for( xCoord = 0 ; xCoord < xPixWidth ; xCoord++ ) {
-          //for( var yCoord = yRotBoundOffset , offsetYCenter = yRotBoundOffset + Math.round( yPixWidth / 2 ) ; yCoord < yPixWidthRot ; yCoord++ ) {
-            //for( var xCoord = xRotBoundOffset , offsetXCenter = xRotBoundOffset + Math.round( xPixWidth / 2 ) ; xCoord < xPixWidthRot ; xCoord++ ) {
-              z = [ 0 , 0 ] ;
-              curPixel = xCoord + xPixWidth * yCoord ;
-              //if( renderEngine === "Polar" ) {
-                //// Polar TODO: should memoize trig?
-                //rotTransform = angleUpdateRad + pixPolarPhi[ curPixel ] ;
-                //complexPixel= [
-                  //Math.round( xPixWidth / 2 + Math.cos( rotTransform ) * pixPolarMod[ curPixel ] + xRotBoundOffset ) ,
-                  //Math.round( yPixWidth / 2 + Math.sin( rotTransform ) * pixPolarMod[ curPixel ] + yRotBoundOffset ) ,
-                //] ;
-              //} else {
-                // Cartesian
-                complexPixel = [ xCoord , yCoord ] ;
-              //}
-              // MANDELBROT ALGO
-              for( iter = 1 ; iter <= iterVal; iter++ ) {
-                zReSq = z[ Re ] * z[ Re ] , zImSq = z[ Im ] * z[ Im ] ;
-                z = [ zReSq - zImSq + toReZ[ complexPixel[ Re ] ] , 2 * z[ Re ] * z[ Im ] + toImZ[ complexPixel[ Im ] ] ] ;
-                if( zReSq + zImSq > maxSq ) { // iterations diverge
-                  mandelIterData[ curPixel ] = iter ;
-                  break;
-                }
-              }
-              if( iter > iterVal ) { // iterations converge
-                mandelIterData[ curPixel ] = iterVal ;
-              }
-              // END MANDELBROT ALGO
-            }
-          }
-          self.postMessage( mandelIterData ) ;
+          var md = new Uint8ClampedArray( xw * yw ) ;
+          //var angleUpdateRad = - Math.PI * newAngle / 180 ; 
+          var i = 1 ;
+          var y , x , p , z , r2 , i2 , c ;
+          // Mandelbrot Algo
+          for(y=0;y<yw;y=y+1){for(x=0;x<xw;x=x+1){z=[0,0],p=x+xw*y,c=[x,y+ys];for(i=1;i<=iv;i=i+1){r2=z[0]*z[0],i2=z[1]*z[1],z=[r2-i2+re[c[0]],2*z[0]*z[1]+im[c[1]]];if(r2+i2>ms){md[p]=i;break;}}if(i>iv)md[p]=iv;}}
+          this.postMessage( { "mandelIterData" : md , "id" : id } );
+          // TODO: check memory cleanup
+          md = undefined ;
         }
 
-        this.multiThreadCalc = function( yStart , yEnd ) {
+        //console.log( md.length ) ;
+        //console.log( xw * (ye-ys)) ;
+
+        this.multiThreadCalc = function( yStart , yEnd , workerID ) {
           var workerFunc = "onmessage=" + this.workerCalc.toString() ;
           var workerBlob = new Blob( [ workerFunc ] ) ;
           var blobURL = window.URL.createObjectURL( workerBlob ) ;
           //var yPixWidthRot = yPixWidth + yRotBoundExtension ;
           //var xPixWidthRot = xPixWidth + xRotBoundExtension ;
-          var data = {
-            "xStart"          : 0 ,
-            "xPixWidth"       : toReZ.length ,
+          var workerData = {
             "yStart"          : yStart ,
-            //"yStart"          : yStart ,
-            "yPixWidth"       : yEnd ,
+            "yEnd"            : yEnd ,
             //"newAngle"        : $opt.rot.value ,
-            "renderEngine"    : $opt.renderEngine.value ,
+            //"renderEngine"    : $opt.renderEngine.value ,
             "iterVal"         : $opt.iter.value ,
             "toReZ"           : toReZ ,
             "toImZ"           : toImZ ,
             "maxSq"           : maxSq ,
-            //"pixPolarMod"     : pixPolarMod.slice( toReZ.length * yStart , toReZ.length * yEnd ) ,
-            //"pixPolarPhi"     : pixPolarPhi.slice( toReZ.length * yStart , toReZ.length * yEnd ) ,
-            //"pixPolarMod"     : pixPolarMod.subarray( toReZ.length * yStart , toReZ.length * yEnd ) ,
-            //"pixPolarPhi"     : pixPolarPhi.subarray( toReZ.length * yStart , toReZ.length * yEnd ) ,
+            "workerID"        : workerID ,
             //"pixPolarMod"     : pixPolarMod ,
             //"pixPolarPhi"     : pixPolarPhi ,
             //"xRotBoundOffset" : xRotBoundOffset ,
@@ -562,49 +548,58 @@ document.onreadystatechange = function() {
             //"yPixWidthRot"    : yPixWidthRot ,
           } ;
           //console.log( "Data before calling" ) ;
-          console.log( data ) ;
+          //console.log( data ) ;
           $mBrotWorkers.push( new Worker( blobURL ) ) ;
-          var that = this ;
           $mBrotWorkers[ $mBrotWorkers.length - 1 ].onmessage = function( e ) { 
-            mandelIterData = Uint8Array.from( e.data ) ;
-            $util.consoleLog( "Core done" , Math.round( performance.now() - start ) + " ms" ) ;
+            //console.log( e.data ) ;
+            var totalThreads = $opt.multiThread.options[ $opt.multiThread.value ] ;
+            //mThreadData.push( { "data" : Uint8Array.from( e.data.mandelIterData ) , "id" : e.data.id } ) ;
+            mThreadData[ e.data.id ] = Uint8Array.from( e.data.mandelIterData ) ;
+            this.upThreadCount() ;
+            if( this.getThreadCount() === totalThreads ) {
+              //console.log( "Done!" ) ;
+              //console.log( mThreadData[0] ) ;
+              this.redraw( yStart , yEnd , e.data.id) ;
+              //mandelIterData = mThreadData.reduce( function( acc , el ) { return acc.concat( el ) ;} , [] ) ;
+              mThreadData = [] ;
+              this.resetThreadCount() ;
+              $util.consoleLog( "Done" , Math.round( performance.now() - start ) + " ms" ) ;
+            } ;
+            //mThreadData[ e.data.id ] = Uint8Array.from( e.data.mandelIterData ) ;
+            //$util.consoleLog( "Thread " + e.data.id + " done" , Math.round( performance.now() - start ) + " ms" ) ;
             //console.log( "mandelIterData.length" , mandelIterData.length ) ;
             //console.log( "toReZ.length * toImZ.length" , toReZ.length * toImZ.length ) ;
             //console.log( "yStart , yEnd" , yStart , yEnd ) ;
-            that.redraw( yStart , yEnd ) ;
-          } ;
+            //console.log( yStart , yEnd ) ;
+          }.bind( this ) ;
           var start = performance.now() ;
-          $mBrotWorkers[ $mBrotWorkers.length - 1 ].postMessage( JSON.stringify( data ) ) ;
+          $mBrotWorkers[ $mBrotWorkers.length - 1 ].postMessage( workerData ) ;
         } ;
 
-        // Ye new & improved polar-enabled algo
-        // Now with multithread!!
-
         this.polarCalc = function polarCalc() {
-          window[ "$mBrotSharedData" ] = [ 1,2,3 ] ;
           this.polarCalcPrep() ;
           var threads = $opt.multiThread.options[ $opt.multiThread.value ];
-          $util.consoleLog( "Threads" , threads ) ;
-          //$util.consoleLog( "Worker support" , this.hasWorkers ? "Yes" : "No" ) ;
           if( this.hasWorkers() && $opt.multiThread.value !== "One" ) {
             var yThreadWidth = Math.ceil( yPixWidth / threads ) ;
-            $util.consoleLog( "Multithread mode" ) ;
             window.$mBrotWorkers = [] ;
             for( var t = 0 ; t < threads  ; t++ ) {
-            //for( var t = 0 ; t < 1  ; t++ ) {
               var yStart = t * yThreadWidth ;
               var yEnd  = yStart + yThreadWidth ;
-              //var yStart = 100 ;        // TODO: ONE THREAD TEST
-              //var yEnd  = 102 ; // TODO: ONE THREAD TEST
-              this.multiThreadCalc( yStart , yEnd ) ;
+              this.multiThreadCalc( yStart , yEnd , t ) ;
             }
           } else {
-            $util.consoleLog( "Done" , $util.timeExec( this.singleThreadCalc , this ) ) ;
+            $util.consoleLog( "Render" , $util.timeExec( this.singleThreadCalc , this ) ) ;
           }
           return this ;
         } ;
 
         // API
+
+        this.start = function() {
+          $util.consoleLog( "Multithread" , this.hasWorkers ? "Yes" : "No" ) ;
+          return this ;
+        } ;
+
         this.init = function() {
           $util.consoleLog( "Init" , $util.timeExec( function() {
             this.initCanvas() ;
@@ -624,144 +619,144 @@ document.onreadystatechange = function() {
           return this ;
         } ;
 
-        this.redraw = function redraw( yStart , yEnd ) {
+        this.redraw = function redraw( yStart , yEnd , id ) {
           yStart = yStart || 0 ;
           yEnd = yEnd || yPixWidth ;
-          //$util.consoleLog( "Draw" , $util.timeExec( function() {
           this.updateColorLevelArr() ;
-          this.draw( yStart , yEnd ) ;
+          //this.draw( yStart , yEnd , id ) ;
+          this.threadDraw() ;
           //} , this ) ) ;
-          //$util.consoleLog( "ok" , "X" + getZoom() , $frac ) ;
+          //$util.consoleLog( "Zoom level" , getZoom() , $frac ) ;
           return this ;
-        } ;
+      } ;
 
-        this.listen = function listen() {
-          canvas.addEventListener( "click" , function( ev ) {
-            $ctrl.mapControls() ;
-            this.updateDrawParams( ev ).render() ;
-            $ctrl.createControls().render() ;
-          }.bind( this ) ) ;
-          return this ;
-        } ;
-
+      this.listen = function listen() {
+        canvas.addEventListener( "click" , function( ev ) {
+          $ctrl.mapControls() ;
+          this.updateDrawParams( ev ).render() ;
+          $ctrl.createControls().render() ;
+        }.bind( this ) ) ;
         return this ;
+      } ;
 
-        }.bind({}) () ) ;
+      return this ;
 
-        var $ctrl = ( function() {
+    }.bind({}) () ) ;
 
-          // private
-          var form = document.querySelector( "#ctrl" ) ;
-          var optionDisplay = document.querySelector( "#option-display" ) ;
-          var controls = [] ;
-          var recalcOnSubmit = false ;
+    var $ctrl = ( function() {
 
-          // public
-          this.init = function() {
-            this.render() ;
-            return this ;
-          } ;
+      // private
+      var form = document.querySelector( "#ctrl" ) ;
+      var optionDisplay = document.querySelector( "#option-display" ) ;
+      var controls = [] ;
+      var recalcOnSubmit = false ;
 
-          this.createControls = function() {
-            controls = [] ;
+      // public
+      this.init = function() {
+        this.render() ;
+        return this ;
+      } ;
 
-            for( var opt in $opt ) {
+      this.createControls = function() {
+        controls = [] ;
 
-              switch( $opt[ opt ].type ) {
-                case( "text" ) :
-                  var inputElement = document.createElement( "input" ) ;
-                  inputElement.setAttribute( "type" , $opt[ opt ].type ) ;
-                  inputElement.setAttribute( "value" , $opt[ opt ].value ) ;
-                  inputElement.setAttribute( "name" , opt ) ;
-                  break ;
-                case( "select" ) :
-                  var inputElement = document.createElement( "select" ) ;
-                  var dropDownOpts = $opt[ opt ].options ;
-                  var curOption = $opt[ opt ].value ;
-                  inputElement.setAttribute( "name" , opt ) ;
-                  for( var dropDownO in dropDownOpts ) {
-                    var curOpt = document.createElement( "option" ) ;
-                    curOpt.setAttribute( "value" , dropDownO ) ;
-                    if( dropDownO === curOption ) curOpt.setAttribute( "selected" , "" ) ;
-                    curOpt.innerHTML = dropDownO ;
-                    inputElement.appendChild( curOpt ) ;
-                  }
+        for( var opt in $opt ) {
+
+          switch( $opt[ opt ].type ) {
+            case( "text" ) :
+              var inputElement = document.createElement( "input" ) ;
+              inputElement.setAttribute( "type" , $opt[ opt ].type ) ;
+              inputElement.setAttribute( "value" , $opt[ opt ].value ) ;
+              inputElement.setAttribute( "name" , opt ) ;
+              break ;
+            case( "select" ) :
+              var inputElement = document.createElement( "select" ) ;
+              var dropDownOpts = $opt[ opt ].options ;
+              var curOption = $opt[ opt ].value ;
+              inputElement.setAttribute( "name" , opt ) ;
+              for( var dropDownO in dropDownOpts ) {
+                var curOpt = document.createElement( "option" ) ;
+                curOpt.setAttribute( "value" , dropDownO ) ;
+                if( dropDownO === curOption ) curOpt.setAttribute( "selected" , "" ) ;
+                curOpt.innerHTML = dropDownO ;
+                inputElement.appendChild( curOpt ) ;
               }
+          }
 
-              var container = document.createElement( "div" ) ;
-              var label = document.createElement( "div" ) ;
-              var txt = document.createTextNode( $opt[ opt ].labelText ) ;
+          var container = document.createElement( "div" ) ;
+          var label = document.createElement( "div" ) ;
+          var txt = document.createTextNode( $opt[ opt ].labelText ) ;
 
 
-              container   .setAttribute( "id"    ,   opt                  ) ;
-              label       .setAttribute( "class" ,  "control-input label" ) ;
-              inputElement.setAttribute( "class" ,  "control-input field" ) ;
+          container   .setAttribute( "id"    ,   opt                  ) ;
+          label       .setAttribute( "class" ,  "control-input label" ) ;
+          inputElement.setAttribute( "class" ,  "control-input field" ) ;
 
-              container   .appendChild( inputElement  ) ;
-              label       .appendChild( txt           ) ;
-              container   .appendChild( label         ) ;
+          container   .appendChild( inputElement  ) ;
+          label       .appendChild( txt           ) ;
+          container   .appendChild( label         ) ;
 
-              if( $opt[ opt ].devStatus ) {
-                var devStatus = document.createElement( "div" ) ;
-                var devStatusTxt = document.createTextNode( $opt[ opt ].devStatus ) ;
-                devStatus.setAttribute( "class" , "control-input dev-status " + $opt[ opt ].devStatus ) ;
-                devStatus.appendChild( devStatusTxt ) ;
-                container .appendChild( devStatus ) ;
-              }
+          if( $opt[ opt ].devStatus ) {
+            var devStatus = document.createElement( "div" ) ;
+            var devStatusTxt = document.createTextNode( $opt[ opt ].devStatus ) ;
+            devStatus.setAttribute( "class" , "control-input dev-status " + $opt[ opt ].devStatus ) ;
+            devStatus.appendChild( devStatusTxt ) ;
+            container .appendChild( devStatus ) ;
+          }
 
-              controls    .push( container ) ;
-            }
-            return this ;
-          } ;
-
-          this.mapControls = function() {
-            for( var opt in $opt ) {
-              if( form.hasOwnProperty( opt ) ) {
-                var curOpt = form.elements[ opt ].value ;
-                curOpt = isNaN( parseFloat( curOpt ) ) ? curOpt : parseFloat( curOpt ) ;
-                if( $opt[ opt ].value !== curOpt ) {
-                  recalcOnSubmit += $opt[ opt ].recalcNeeded ;
-                  $opt[ opt ].value = curOpt ;
-                }
-              }
-            }
-            return this ;
-          } ;
-
-          this.listen = function() {
-            form.addEventListener( "submit" , function( ev ) {
-              ev.preventDefault() ;
-              recalcOnSubmit = 0 ;
-              this.mapControls() ;
-              if( recalcOnSubmit !== 0 ) {
-                $frac.updateDrawParams().init() ;
-              } else {
-                $frac.redraw() ;
-              }
-            }.bind( this ) ) ;
-            return this ;
-          } ;
-
-          this.render = function() {
-            //TODO improve this
-            this.createControls() ;
-            optionDisplay.innerHTML = "" ;
-            controls.forEach( function( el ) {
-              optionDisplay.appendChild( el ) ;
-            } ) ; 
-            return this;
-          } ;
-
-          return this ;
-
-        }.bind({}) () ) ; 
-
-        function main() {
-          $frac.init().listen() ;
-          $ctrl.init().listen() ;
+          controls    .push( container ) ;
         }
+        return this ;
+      } ;
 
-        // Let's Roll!
-        main() ;
-      }
+      this.mapControls = function() {
+        for( var opt in $opt ) {
+          if( form.hasOwnProperty( opt ) ) {
+            var curOpt = form.elements[ opt ].value ;
+            curOpt = isNaN( parseFloat( curOpt ) ) ? curOpt : parseFloat( curOpt ) ;
+            if( $opt[ opt ].value !== curOpt ) {
+              recalcOnSubmit += $opt[ opt ].recalcNeeded ;
+              $opt[ opt ].value = curOpt ;
+            }
+          }
+        }
+        return this ;
+      } ;
+
+      this.listen = function() {
+        form.addEventListener( "submit" , function( ev ) {
+          ev.preventDefault() ;
+          recalcOnSubmit = 0 ;
+          this.mapControls() ;
+          if( recalcOnSubmit !== 0 ) {
+            $frac.updateDrawParams().init() ;
+          } else {
+            $frac.redraw() ;
+          }
+        }.bind( this ) ) ;
+        return this ;
+      } ;
+
+      this.render = function() {
+        //TODO improve this
+        this.createControls() ;
+        optionDisplay.innerHTML = "" ;
+        controls.forEach( function( el ) {
+          optionDisplay.appendChild( el ) ;
+        } ) ; 
+        return this;
+      } ;
+
+      return this ;
+
+    }.bind({}) () ) ; 
+
+    function main() {
+      $frac.start().init().listen() ;
+      $ctrl.init().listen() ;
     }
+
+    // Let's Roll!
+    main() ;
+  }
+}
