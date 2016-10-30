@@ -12,14 +12,11 @@ var UTIL = ( function() {
 
   var timeExec = function( f , context ) {
     const VALUE = 0 , UNIT = 1 ;
-    var c = context || this ;
+    var c = context || window ;
     var initTime = performance.now();
     f.bind( c )() ;
     var endTime = performance.now();
-    var t = ( endTime - initTime ) ;
-    var mSecOrSec = t > 1000 ? [ 1 , "&nbsp;&nbsp;s" ] : [ 1000 ,  "&nbsp;ms" ] ;
-    var delta = Math.round( mSecOrSec[ VALUE ] * t ) / 1000 ;
-    return delta + mSecOrSec[ UNIT ] ;
+    return Math.round( endTime - initTime ) + "&nbsp;ms";
   } ;
 
   var consoleLog = function( msg , data ) {
@@ -30,8 +27,8 @@ var UTIL = ( function() {
   } ;
 
   var API = {
-    "timeExec" : timeExec ,
-    "consoleLog" : consoleLog ,
+    "timeExec"    : timeExec ,
+    "consoleLog"  : consoleLog ,
   } ;
 
   return API ;

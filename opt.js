@@ -147,8 +147,10 @@ var OPT = ( function() {
 
   var getMaxSq = function() { return optionData.max.value * optionData.max.value } ;
   var getZoom = function() { return optionData.zoom.value } ;
+  var getRot = function() { return optionData.rot.value } ;
   var isPolar  = function() { return optionData.renderEngine.value === "Polar" } ;
   var updateIterOnClick = function() { optionData.iter.value += optionData.deltaIter.value ; } ;
+  var getNumThreads = function() { return optionData.multiThread.options[ optionData.multiThread.value ]; } ;
 
   return {
     "getOptionData"     : getOptionData ,
@@ -156,6 +158,8 @@ var OPT = ( function() {
     "getColors"         : getColors ,
     "getMaxSq"          : getMaxSq ,
     "getZoom"           : getZoom ,
+    "getRot"            : getRot ,
+    "getNumThreads"     : getNumThreads ,
     "isPolar"           : isPolar ,
     "getInnerColor"     : getInnerColor ,
     "getRimColor"       : getRimColor ,

@@ -10,18 +10,18 @@
 
 var CANVAS = ( function() {
 
-  var canvas ;
-  var ctx ;
-  var initCanvas = function() {
-    canvas = document.querySelector( "canvas" ) , ctx, imgData  ;
-    canvas.width  = xPixWidth = window.innerWidth || 300 ;
-    canvas.height = yPixWidth = window.innerHeight || 300 ;
-    return this;
-  } ;
-
-  var initContext = function() {
-    ctx = canvas.getContext( "2d" ) ;
-    imgData = ctx.getImageData( 0 , 0 , xPixWidth , yPixWidth ) ;
+  var canvas , ctx , imgData ;
+  var init = function() {
+    if( typeof canvas === "undefined" ) { canvas = document.querySelector( "canvas" ) ; } ;
+    var newWidth = canvas.width !== window.innerWidth ;
+    var newHeight = canvas.height !== window.innerHeight ;
+    if( newWidth || newHeight ) {
+      // TODO: check proper canvas re-init on resize
+      canvas.width  = window.innerWidth || 300 ;
+      canvas.height = window.innerHeight || 300 ;
+      ctx = canvas.getContext( "2d" ) ;
+      imgData = ctx.getImageData( 0 , 0 , canvas.width , canvas.height ) ;
+    }
     return this;
   }
 
@@ -30,22 +30,23 @@ var CANVAS = ( function() {
   var getHeight      = function() { return canvas.height ; } ;
   var getOffsetTop   = function() { return canvas.offsetTop ; } ;
   var getOffsetLeft  = function() { return canvas.offsetLeft ; } ;
-
-  var imgData ;
-  var setImgData = function( newVal ) { imgData = newVal ; } ;
+  var putImageData   = function() { ctx.putImageData( imgData, 0 , 0 ); } ;
 
   var colorRGB ;
   var updateColorLevelArr = function() {
     colorRGB = [] ;
+    var R = 0 , G = 1 , B = 2 ;
     var innerColor = OPT.getInnerColor() ;
     var rimColor   = OPT.getRimColor() ;
     var haloColor  = OPT.getHaloColor() ;
     var outerColor = OPT.getOuterColor() ;
-    var R = 0 , G = 1 , B = 2 ;
-    for( var col = OPT.getOptionData().iter.value ; col >= 0 ; col-- ) {
-      var brightnessDecay = 1 / Math.exp( col * OPT.getOptionData().haloDecay.value / 100 ) ;
-      var bezierFactor = col / OPT.getOptionData().iter.value ;
-      var brightMulti = brightnessDecay * OPT.getOptionData().brightness.value ;
+    var iters      = OPT.getOptionData().iter.value ;
+    var haloDecay  = OPT.getOptionData().haloDecay.value ;
+    var brightness = OPT.getOptionData().brightness.value ;
+    for( var col = iters ; col >= 0 ; col-- ) {
+      var brightnessDecay = 1 / Math.exp( col * haloDecay / 100 ) ;
+      var bezierFactor = col / iters ;
+      var brightMulti = brightnessDecay * brightness ;
       colorRGB.push( [
           MATH.bezier4( innerColor[ R ] , rimColor[ R ] , haloColor[R] , outerColor[ R ] , bezierFactor ) * brightMulti ,
           MATH.bezier4( innerColor[ G ] , rimColor[ G ] , haloColor[G] , outerColor[ G ] , bezierFactor ) * brightMulti ,
@@ -55,9 +56,7 @@ var CANVAS = ( function() {
     return this ;
   } ;
 
-  var putImageData = function() { ctx.putImageData( imgData, 0 , 0 ); }
-
-  this.draw = function draw() {
+  var draw = function draw() {
     var R = 0 , G = 1 , B = 2 ;
     var mThreadData = ITER.getThreadData() ;
     var threadIndex , threadDataLength;
@@ -73,22 +72,18 @@ var CANVAS = ( function() {
         imgData.data[ RGBAPixOffset + 3 ] = 255 ; // alpha
       }
     }
-    ITER.resetThreadData() ;
     putImageData( imgData ) ;
     return this ;
   } ;
 
-  var redraw = function redraw() {
+  var redraw = function redraw( mThreadData ) {
     updateColorLevelArr() ;
     draw() ;
-    //UTIL.consoleLog( "Zoom level" , getZoom() , fracCtl ) ;
     return this ;
   } ;
 
-
   return {
-    "initCanvas"           : initCanvas ,
-    "initContext"          : initContext ,
+    "init"                 : init ,
     "getCanvas"            : getCanvas ,
     "getWidth"             : getWidth ,
     "getHeight"            : getHeight ,

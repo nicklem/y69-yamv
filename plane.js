@@ -12,31 +12,30 @@ var PLANE = ( function() {
 
   var overallZoom = 1 ;
   var getOverallZoom = function() { return overallZoom ; } ;
-  var setOverallZoom = function( newVal ) { overallZoom = newVal ; } ;
+  var updateOverallZoomFactor = function() { overallZoom *= OPT.getZoom() } ;
 
-  var xCenter ;
-  var setXCenter = function(xCenter) { xCenter = xCenter; } 
-  var getXCenter = function() { return xCenter; } 
-
-  var yCenter ;
-  var setYCenter = function(yCenter) { yCenter = yCenter; } 
-  var getYCenter = function() { return yCenter; } 
+  var xCenter , yCenter ;
+  var updateCPlaneCenter = function() {
+    xCenter = xMin + ( xPixCenter / xPixWidth ) * xWidth ;
+    yCenter = yMin + ( yPixCenter / yPixWidth ) * yWidth ;
+  } ;
 
   var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
   var xWidth = xMax - xMin ;
   var yWidth = yMax - yMin ;
-  var setBounds = function ( xMinVal , xMaxVal , yMinVal , yMaxVal ) {
-    xMin = xMinVal , xMax = xMaxVal , yMin = yMinVal , yMax = yMaxVal ;
+  var zoomCPlaneBounds = function() {
+    var z = OPT.getZoom() ;
+    xMin = xCenter - ( xWidth / ( 2 * z ) ) ;
+    xMax = xCenter + ( xWidth / ( 2 * z ) ) ;
+    yMin = yCenter - ( yWidth / ( 2 * z ) ) ;
+    yMax = yCenter + ( yWidth / ( 2 * z ) ) ;
+  } ;
+
+  var updateCPlaneWidths = function() {
     xWidth = xMax - xMin ;
     yWidth = yMax - yMin ;
-    return this;
   } ;
-  var getXMin = function() { return xMin; } 
-  var getXMax = function() { return xMax; } 
-  var getYMin = function() { return yMin; } 
-  var getYMax = function() { return yMax; } 
 
-  // TODO
   var deltaX , deltaY ;
 
   var xPixWidth ;
@@ -84,17 +83,15 @@ var PLANE = ( function() {
   var getToPixMod = function() { return toPixMod ; } ;
 
   var initHeight = function() {
-    var idealX = ( yMax - yMin ) * ( xPixWidth / yPixWidth ) ;
+    var idealX = yWidth * ( xPixWidth / yPixWidth ) ;
     xMin = -3/5 * idealX , xMax = 2/5 * idealX ;
-    xWidth = xMax - xMin ;
-    yWidth = yMax - yMin ;
+    updateCPlaneWidths() ;
   } ;
 
   var initWidth = function() {
-    var idealY = ( yMax - yMin ) * ( yPixWidth / xPixWidth ) ;
+    var idealY = xWidth * ( yPixWidth / xPixWidth ) ;
     yMin = - idealY / 2 , yMax = idealY / 2 ;
-    xWidth = xMax - xMin ;
-    yWidth = yMax - yMin ;
+    updateCPlaneWidths() ;
   } ;
 
   var setPixWidths = function( newWidth , newHeigth ) {
@@ -106,9 +103,6 @@ var PLANE = ( function() {
     return this ;
   } ;
 
-  //var setCPlaneBounds = function( xMinVal , xMaxVal , yMinVal , yMaxVal ) {
-  //} ;
-
   var setDeltasPerPixel = function() {
     deltaX = ( xMax - xMin ) / xPixWidth ;
     deltaY = ( yMax - yMin ) / yPixWidth ;
@@ -116,7 +110,7 @@ var PLANE = ( function() {
   } ;
 
   var toReZ , toImZ ;
-  var setPToCArrays = function setPToCArrays() {
+  var setPToCArrays = function() {
     toReZ = new Float64Array( xPixWidth + xRotBoundExtension ) ;
     toImZ = new Float64Array( yPixWidth + yRotBoundExtension ) ;
     for( i = 0 ; i < ( xPixWidth + xRotBoundExtension ) ; i++ ) { toReZ[i] = xMin + ( deltaX * ( i - xRotBoundOffset ) ) ; }
@@ -126,8 +120,8 @@ var PLANE = ( function() {
 
   var getToReZ = function() { return toReZ ; } ;
   var getToImZ = function( yStart , yEnd ) {
-    yStart  = yStart  || 0 ;
-    yEnd    = yEnd    || yPixWidth ;
+    yStart = yStart || 0 ;
+    yEnd = yEnd || yPixWidth ;
     return toImZ.subarray( yStart , yEnd ) ;
   } ;
 
@@ -135,30 +129,22 @@ var PLANE = ( function() {
     return toImZ.length * toReZ.length ;
   } ;
 
-  var updateDrawParams = function updateDrawParams( ev ) {
-    maxSq = OPT.getMaxSq() ;
-    if( !! ev ) { // onClick update, as opposed to form submit update
-      // update iter count
-      OPT.updateIterOnClick() ;
-      setXPixCenter( ev.layerX ) ;
-      setYPixCenter( ev.layerY ) ;
-      // update center
-      // remap click event if plane rotated
-      var rotX = OPT.isPolar() ?
-        this.rotComplex( [ xPixCenter , yPixCenter ] , this.toRad( -OPT.getOptionData().rot.value ) ) :
-        [ xPixCenter , yPixCenter ] ;
-      xPixCenter = rotX[ 0 ] ;
-      yPixCenter = rotX[ 1 ] ;
-      // update center to complex plane
-      setOverallZoom( getOverallZoom() * OPT.getZoom() ) ;
-      xCenter = xMin + ( xPixCenter / xPixWidth ) * xWidth ;
-      yCenter = yMin + ( yPixCenter / yPixWidth ) * yWidth ;
-      xMin = xCenter - ( xWidth / ( 2 * getOverallZoom() ) ) ;
-      xMax = xCenter + ( xWidth / ( 2 * getOverallZoom() ) ) ;
-      yMin = yCenter - ( yWidth / ( 2 * getOverallZoom() ) ) ;
-      yMax = yCenter + ( yWidth / ( 2 * getOverallZoom() ) ) ;
-      console.log( getOverallZoom() ) ;
-    }
+  var updateDrawParams = function( ev ) {
+    setXPixCenter( ev.layerX ) ;
+    setYPixCenter( ev.layerY ) ;
+    OPT.updateIterOnClick() ;
+    updateOverallZoomFactor() ;
+    // TODO: polar parameter update with click remap
+    //var rotX = OPT.isPolar() ?
+    //this.rotComplex( [ xPixCenter , yPixCenter ] , this.toRad( - OPT.getRot() ) ) :
+    //[ xPixCenter , yPixCenter ] ;
+    //setXPixCenter( ev.layerX ) ;
+    //setYPixCenter( ev.layerY ) ;
+    //xPixCenter = rotX[ 0 ] ;
+    //yPixCenter = rotX[ 1 ] ;
+    updateCPlaneCenter() ;
+    zoomCPlaneBounds() ;
+    updateCPlaneWidths() ;
     return this ; 
   } ;
 
@@ -167,20 +153,13 @@ var PLANE = ( function() {
     "setPixWidths"        : setPixWidths ,
     "setDeltasPerPixel"   : setDeltasPerPixel ,
     "getOverallZoom"      : getOverallZoom ,
-    "setOverallZoom"      : setOverallZoom ,
-    "setBounds"           : setBounds ,
+    //"setCPlaneBounds"     : setCPlaneBounds ,
     "getTotalPixelNumber" : getTotalPixelNumber ,
     "getToReZ"            : getToReZ ,
     "getToImZ"            : getToImZ ,
     "updateDrawParams"    : updateDrawParams ,
+    "getYPixWidth"        : getYPixWidth ,
   } ;
 
   return API ;
 } () ) ; // END PLANE
-
-
-
-//var setXMin = function(xMin) { this.xMin = xMin; } 
-//var setXMax = function(xMax) { this.xMax = xMax; } 
-//var setYMin = function(yMin) { this.yMin = yMin; } 
-//var setYMax = function(yMax) { this.yMax = yMax; } 
