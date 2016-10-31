@@ -59,6 +59,7 @@ var CANVAS = ( function() {
   var draw = function draw() {
     var R = 0 , G = 1 , B = 2 ;
     var mThreadData = ITER.getThreadData() ;
+    console.log( mThreadData ) ;
     var threadIndex , threadDataLength;
     var numThreads = mThreadData.length ;
     for( threadIndex = 0 ; threadIndex < numThreads ; threadIndex += 1 ) {

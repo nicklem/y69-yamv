@@ -57,16 +57,15 @@ var OPT = ( function() {
     } ,
 
     "renderEngine" : {
-      "value" : "Cartesian" ,
+      "value" : "Polar" ,
       "labelText" : "Engine" ,
       "type"  : "select" ,
       "options": { "Cartesian" : "Cartesian" , "Polar" : "Polar" } ,
       "recalcNeeded": YES ,
-      "devStatus" : "beta" ,
     } ,
 
     "rot" : {
-      "value" : 0 ,
+      "value" : 10 ,
       "labelText" : "Rotation" ,
       "type"  : "text" ,
       "recalcNeeded": YES ,
@@ -74,11 +73,10 @@ var OPT = ( function() {
 
     "multiThread" : {
       "value" : "Two" ,
-      "labelText" : "Cores" ,
+      "labelText" : "Threads" ,
       "type"  : "select" ,
       "options": { "One" : 1 , "Two" : 2 , "Four" : 4 , "Eight" : 8 } ,
       "recalcNeeded": NO ,
-      "devStatus" : "alpha" ,
     } ,
 
     "brightness" : {
@@ -134,11 +132,11 @@ var OPT = ( function() {
     if( typeof( optionData[ opt ].value ) !== "undefined") {
       optionData[ opt ].value =  val ; 
     } else throw new Error( "Setting non-existent option" ) ;
-  }
+  } ;
 
   var getColors = function() {
     return colors ;
-  }
+  } ;
 
   var getInnerColor = function() { return colors[ optionData.innerColor.value ] ; } ;
   var getRimColor   = function() { return colors[ optionData.rimColor.value ] ; } ;
@@ -148,7 +146,7 @@ var OPT = ( function() {
   var getMaxSq = function() { return optionData.max.value * optionData.max.value } ;
   var getZoom = function() { return optionData.zoom.value } ;
   var getRot = function() { return optionData.rot.value } ;
-  var isPolar  = function() { return optionData.renderEngine.value === "Polar" } ;
+  var isPolar = function() { return optionData.renderEngine.value === "Polar" } ;
   var updateIterOnClick = function() { optionData.iter.value += optionData.deltaIter.value ; } ;
   var getNumThreads = function() { return optionData.multiThread.options[ optionData.multiThread.value ]; } ;
 
@@ -158,9 +156,9 @@ var OPT = ( function() {
     "getColors"         : getColors ,
     "getMaxSq"          : getMaxSq ,
     "getZoom"           : getZoom ,
-    "getRot"            : getRot ,
     "getNumThreads"     : getNumThreads ,
     "isPolar"           : isPolar ,
+    "getRot"            : getRot ,
     "getInnerColor"     : getInnerColor ,
     "getRimColor"       : getRimColor ,
     "getHaloColor"      : getHaloColor ,

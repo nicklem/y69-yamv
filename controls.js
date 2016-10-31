@@ -73,7 +73,7 @@ var CONTROLS = ( function() {
     return this ;
   } ;
 
-  var mapControls = function() {
+  var mapToOptions = function() {
     // TODO: improve getting options
     var currentOptions = JSON.parse( JSON.stringify( OPT.getOptionData() ) ) ;
     for( var option in currentOptions ) {
@@ -81,6 +81,7 @@ var CONTROLS = ( function() {
         var curOpt = form.elements[ option ].value ;
         curOpt = isNaN( parseFloat( curOpt ) ) ? curOpt : parseFloat( curOpt ) ;
         if( currentOptions[ option ].value !== curOpt ) {
+          console.log( option , curOpt ) ;
           recalcOnSubmit += currentOptions[ option ].recalcNeeded ;
           OPT.setOption( option , curOpt ) ;
         }
@@ -93,9 +94,9 @@ var CONTROLS = ( function() {
     form.addEventListener( "submit" , function( ev ) {
       ev.preventDefault() ;
       recalcOnSubmit = 0 ;
-      mapControls() ;
+      mapToOptions() ;
       if( recalcOnSubmit !== 0 ) {
-        FRAC_CTL.init() ;
+        ITER.execCalc() ;
       } else {
         UTIL.consoleLog( "Redraw" , UTIL.timeExec( CANVAS.redraw ) ) ;
       }
@@ -114,7 +115,7 @@ var CONTROLS = ( function() {
   } ;
 
   return {
-    "mapControls"     : mapControls ,
+    "mapToOptions"    : mapToOptions ,
     "createControls"  : createControls ,
     "init"            : init ,
     "listen"          : listen ,
