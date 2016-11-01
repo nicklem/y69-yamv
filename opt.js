@@ -28,7 +28,7 @@ var OPT = ( function() {
 
   var optionData = {
 
-    max : { // max before algo can assume it diverges
+    "max" : { // max before algo can assume it diverges
       "value" : 2 ,
       "labelText" : "Max" ,
       "type"  : "text" ,

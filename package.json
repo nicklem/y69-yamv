@@ -1,0 +1,23 @@
+{
+  "name": "y69-yamv",
+  "version": "0.1.0",
+  "description": "Yet another Mandelbrot viewer",
+  "main": "init.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicklem/y69-yamv"
+  },
+  "keywords": [
+    "Mandelbrot",
+    "Fractal",
+    "JavaScript"
+  ],
+  "author": "Nicola Klemenc",
+  "license": "GNU",
+  "bugs": {
+    "url": "https://github.com/nicklem/y69-yamv/issues"
+  }
+}

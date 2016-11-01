@@ -65,15 +65,7 @@ var ITER = ( function() {
       startWorker( workerID , yStart , yEnd ) ;
     }
   } ;
-  
-  var xRotOffset = function( x , y  , theta ) {
-    return ( x - ( x * Math.cos( theta ) + y * Math.sin( theta ) ) ) ;
-  } ;
-
-  var yRotOffset = function( x , y , theta ) {
-    return ( y + ( x * Math.sin( theta ) - y * Math.cos( theta ) ) ) ;
-  } ;
-
+ 
   var startWorker = function( workerID , yStart , yEnd ) {
     if( isWorkerUndefined( workerID ) ) { setWorker( workerID ) ; }
     // TODO: improve performance timing
@@ -93,10 +85,8 @@ var ITER = ( function() {
       "xWidth"             : xC ,
       "workerID"           : workerID ,
       "isPolar"            : OPT.isPolar() ,
-      "xOriginRotOffset"   : xRotOffset( xC/2 , yC/2 , MATH.toRad( OPT.getRot() ) ) ,
-      "yOriginRotOffset"   : yRotOffset( xC/2 , yC/2 , MATH.toRad( OPT.getRot() ) ) ,
-      // "xOriginRotOffset"   : xC / 4 ,
-      // "yOriginRotOffset"   : yC / 4 ,
+      "xOriginRotOffset"   : MATH.xRotOffset( xC/2 , yC/2 , MATH.toRad( OPT.getRot() ) ) ,
+      "yOriginRotOffset"   : MATH.yRotOffset( xC/2 , yC/2 , MATH.toRad( OPT.getRot() ) ) ,
       "xRotBoundOffset"    : PLANE.getXRotBoundOffset() ,
       "yRotBoundOffset"    : PLANE.getYRotBoundOffset() ,
       "rotationAngle"      : MATH.toRad( OPT.getRot() )

@@ -80,12 +80,9 @@ var PLANE = ( function() {
     if( OPT.isPolar() ) {
       var l = xPixWidth / 2 , h = yPixWidth / 2 ;
       var diag = Math.sqrt( l * l + h * h ) ;
-      // var pinchCorrection = 10 ;
-      var pinchCorrection = 0 ;
-      xRotBoundOffset = yRotBoundOffset = Math.ceil( diag - ( l < h ? l : h ) ) + pinchCorrection ;
+      xRotBoundOffset = yRotBoundOffset = Math.ceil( diag - ( l < h ? l : h ) ) ;
       xRotBoundExtension = 2 * xRotBoundOffset ;
       yRotBoundExtension = 2 * xRotBoundOffset ;
-      // console.log( xRotBoundOffset , yRotBoundOffset , xRotBoundExtension , yRotBoundExtension ) ;
     } else {
       xRotBoundOffset = yRotBoundOffset = xRotBoundExtension = yRotBoundExtension = 0 ;
     }
@@ -126,52 +123,25 @@ var PLANE = ( function() {
   var getToReZ = function() { return toReZ ; } ;
   var getToImZ = function() { return toImZ ; } ;
 
-  // // TODO: Polar
-  // var toPixMod , toPixPhi ;
-  // var setPModPhiArrays = function() {
-  //   var curPixel , offsetXCoord , offsetYCoord ;
-  //   var yPixWidthRot = yPixWidth + yRotBoundExtension ;
-  //   var xPixWidthRot = xPixWidth + xRotBoundExtension ;
-  //   toPixMod = new Float32Array( xPixWidthRot * yPixWidthRot ) ;
-  //   toPixPhi = new Float32Array( xPixWidthRot * yPixWidthRot ) ;
-  //   for( var yCoord = yRotBoundOffset , offsetYCenter = yRotBoundOffset + Math.round( yPixWidth / 2 ) ; yCoord < yPixWidthRot ; yCoord++ ) {
-  //     for( var xCoord = xRotBoundOffset , offsetXCenter = xRotBoundOffset + Math.round( xPixWidth / 2 ) ; xCoord < xPixWidthRot ; xCoord++ ) {
-  //       offsetXCoord  = xCoord - offsetXCenter ;
-  //       offsetYCoord  = yCoord - offsetYCenter ;
-  //       curPixel      = xCoord + yCoord * xPixWidth ;
-  //       toPixMod[ curPixel ] = 2 * Math.PI + Math.sqrt( offsetXCoord * offsetXCoord + offsetYCoord * offsetYCoord ) ;
-  //       toPixPhi[ curPixel ] = 2 * Math.PI + Math.atan( offsetXCoord === 0 ? offsetYCoord / 0.0000001 : offsetYCoord / offsetXCoord ) ;
-  //       toPixPhi[ curPixel ] += offsetXCoord < 0 ? Math.PI : 0 ;
-  //       // TODO: special fx!
-  //       //if( true ) {
-  //       //if( toPixPhi[ curPixel ] > Math.PI / 1 )
-  //       //toPixPhi[ curPixel ] = ( Math.round( 1000 * toPixPhi[ curPixel ] ) % ( Math.PI * 1000 / 1 ) ) / 1000 ;
-  //       //}
-  //     }
-  //   }
-  //   return this;
-  // } ;
-
   var getTotalPixelNumber = function() {
     return toImZ.length * toReZ.length ;
   } ;
-  
-  var remapPolarClick = function() {
-    // TODO: polar parameter update with click remap
-    //var rotX = OPT.isPolar() ?
-    //this.rotComplex( [ xPixCenter , yPixCenter ] , this.toRad( - OPT.getRot() ) ) :
-    //[ xPixCenter , yPixCenter ] ;
-    //setXPixCenter( ev.layerX ) ;
-    //setYPixCenter( ev.layerY ) ;
-    //xPixCenter = rotX[ 0 ] ;
-    //yPixCenter = rotX[ 1 ] ;
+
+  var remapPolarClick = function( ev ) {
+    var rotX = OPT.isPolar() ?
+        MATH.rotComplex( [ xPixCenter , yPixCenter ] , MATH.toRad( - OPT.getRot() ) ) :
+        [ xPixCenter , yPixCenter ] ;
+    setXPixCenter( ev.layerX ) ;
+    setYPixCenter( ev.layerY ) ;
+    xPixCenter = rotX[ 0 ] ;
+    yPixCenter = rotX[ 1 ] ;
   } ;
 
   var updateDrawParams = function( ev ) {
     updateOverallZoomFactor() ;
     setXPixCenter( ev.layerX ) ;
     setYPixCenter( ev.layerY ) ;
-    if( OPT.isPolar() ) { remapPolarClick() ; }
+    if( OPT.isPolar() ) { remapPolarClick( ev ) ; }
     updateCPlaneCenter() ;
     zoomCPlaneBounds() ;
     updateCPlaneWidths() ;

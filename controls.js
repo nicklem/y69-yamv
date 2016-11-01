@@ -96,6 +96,7 @@ var CONTROLS = ( function() {
       recalcOnSubmit = 0 ;
       mapToOptions() ;
       if( recalcOnSubmit !== 0 ) {
+        ITER.initCalc() ;
         ITER.execCalc() ;
       } else {
         UTIL.consoleLog( "Redraw" , UTIL.timeExec( CANVAS.redraw ) ) ;

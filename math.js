@@ -17,15 +17,34 @@ var MATH = ( function() {
   var toRad = function( deg ) { return ( Math.PI / 180 ) * deg ; } ;
   var toDeg = function( rad ) { return ( 180 / Math.PI ) * rad ; } ;
   var modulus = function( val ) { return val * Math.sign( val ) ; } ;
+ 
+  var xRotOffset = function( x , y  , theta ) {
+    return ( x - ( x * Math.cos( theta ) + y * Math.sin( theta ) ) ) ;
+  } ;
+
+  var yRotOffset = function( x , y , theta ) {
+    return ( y + ( x * Math.sin( theta ) - y * Math.cos( theta ) ) ) ;
+  } ;
+
+  var xRot = function( x , y , theta ) {
+    return ( x * Math.cos( theta ) + y * Math.sin( theta ) ) ;
+  } ;
+
+  var yRot = function( x , y , theta ) {
+    return ( x * Math.sin( theta ) + y * Math.cos( theta ) ) ;
+  } ;
 
   var rotComplex = function rotComplex( c , rot ) {
-    var curPixRotOffset = ( c[ 0 ] + xRotBoundOffset ) + ( c[ 1 ] + yRotBoundOffset ) * xPixWidth ;
-    //var rotTransform = rot + toPixPhi[ curPixRotOffset ] ;
-    var rotTransform = rot ;
-    return  [
-      Math.floor( xPixWidth / 2 + Math.cos( rotTransform ) * toPixMod[ curPixRotOffset ] ) ,
-      Math.floor( yPixWidth / 2 + Math.sin( rotTransform ) * toPixMod[ curPixRotOffset ] ) ,
-    ];
+    // var curPixRotOffset = ( c[ 0 ] + xRotBoundOffset ) + ( c[ 1 ] + yRotBoundOffset ) * xPixWidth ;
+    // var rotTransform = rot ;
+    // return  [
+    //   Math.floor( xPixWidth / 2 + Math.cos( rotTransform ) * toPixMod[ curPixRotOffset ] ) ,
+    //   Math.floor( yPixWidth / 2 + Math.sin( rotTransform ) * toPixMod[ curPixRotOffset ] ) ,
+    // ];
+    var x = c[ 0 ] , y = c[ 1 ] ;
+    console.log( x , y ) ;
+    console.log( xRot( x , y , rot) , yRot( x , y , rot ) ) ;
+    return [ xRot( x , y , rot) , yRot( x , y , rot ) ] ;
   } ;
 
   var API = {
@@ -34,6 +53,8 @@ var MATH = ( function() {
     "toDeg"      : toDeg ,
     "modulus"    : modulus ,
     "rotComplex" : rotComplex ,
+    "xRotOffset" : xRotOffset ,
+    "yRotOffset" : yRotOffset ,
   } ;
 
   return API ;
