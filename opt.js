@@ -57,7 +57,7 @@ var OPT = ( function() {
     } ,
 
     "renderEngine" : {
-      "value" : "Polar" ,
+      "value" : "Cartesian" ,
       "labelText" : "Engine" ,
       "type"  : "select" ,
       "options": { "Cartesian" : "Cartesian" , "Polar" : "Polar" } ,
@@ -65,7 +65,7 @@ var OPT = ( function() {
     } ,
 
     "rot" : {
-      "value" : 10 ,
+      "value" : 0 ,
       "labelText" : "Rotation" ,
       "type"  : "text" ,
       "recalcNeeded": YES ,

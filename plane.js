@@ -20,7 +20,8 @@ var PLANE = ( function() {
     yCenter = yMin + ( yPixCenter / yPixWidth ) * yWidth ;
   } ;
 
-  var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
+  // var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
+  var xMin = -2 , xMax = 2 , yMin = -1.5 , yMax = 1.5 ;
   var xWidth = xMax - xMin ;
   var yWidth = yMax - yMin ;
   var zoomCPlaneBounds = function() {
@@ -45,47 +46,50 @@ var PLANE = ( function() {
 
   var xPixWidth ;
   // var geTXPIXWidth = function() { return xPixWidth ; } ;
+  var getXPixWidth = function() { return xPixWidth ; } ;
+  var getExtendedXPixWidth = function() { return xPixWidth + xRotBoundExtension ; } ;
   var setXPixWidth = function( newVal ) { xPixWidth = newVal ; } ;
 
   var yPixWidth ;
   var getYPixWidth = function() { return yPixWidth ; } ;
+  var getExtendedYPixWidth = function() { return yPixWidth + yRotBoundExtension ; } ;
   var setYPixWidth = function( newVal ) { yPixWidth = newVal ; } ;
 
   var xPixCenter ;
   // var getXPixCenter = function() { return xPixCenter ; } ;
-  var setXPixCenter = function( newVal ) {
-    xPixCenter = newVal - CANVAS.getOffsetLeft() ;
-  } ;
+  var setXPixCenter = function( newVal ) { xPixCenter = newVal - CANVAS.getOffsetLeft() ; } ;
 
   var yPixCenter ;
   // var getYPixCenter = function() { return yPixCenter ; } ;
-  var setYPixCenter = function( newVal ) {
-    yPixCenter = newVal - CANVAS.getOffsetTop() ;
-  } ;
+  var setYPixCenter = function( newVal ) { yPixCenter = newVal - CANVAS.getOffsetTop() ; } ;
 
   var xRotBoundOffset = 0 ;
-  // var getXRotBoundOffset = function() { return xRotBoundOffset ; } ;
-  // var setXRotBoundOffset = function( newVal ) {
-  //   xRotBoundOffset = newVal ;
-  //   xRotBoundExtension = 2 * xRotBoundOffset ;
-  // } ;
+  var getXRotBoundOffset = function() { return xRotBoundOffset ; } ;
 
-  var yRotBoundOffset = 0;
-  // var getYRotBoundOffset = function() { return yRotBoundOffset ; } ;
-  // var setYRotBoundOffset = function( newVal ) {
-  //   yRotBoundOffset = newVal ;
-  //   yRotBoundExtension = 2 * yRotBoundOffset ;
-  // } ;
-
-  var yRotBoundExtension = 0;
-  // var getYRotBoundExtension = function() { return yRotBoundExtension ; } ;
+  var yRotBoundOffset = 0 ;
+  var getYRotBoundOffset = function() { return yRotBoundOffset ; } ;
 
   var xRotBoundExtension = 0 ;
   // var getXRotBoundExtension = function() { return xRotBoundExtension ; } ;
 
-  // var toPixMod , toPixPhi , rotCalc = 0 ;
-  // var getToPixPhi = function() { return toPixPhi ; } ;
-  // var getToPixMod = function() { return toPixMod ; } ;
+  var yRotBoundExtension = 0 ;
+  // var getYRotBoundExtension = function() { return yRotBoundExtension ; } ;
+
+  var setRotBounds = function() {
+    // Naive approach, but works fine
+    if( OPT.isPolar() ) {
+      var l = xPixWidth / 2 , h = yPixWidth / 2 ;
+      var diag = Math.sqrt( l * l + h * h ) ;
+      // var pinchCorrection = 10 ;
+      var pinchCorrection = 0 ;
+      xRotBoundOffset = yRotBoundOffset = Math.ceil( diag - ( l < h ? l : h ) ) + pinchCorrection ;
+      xRotBoundExtension = 2 * xRotBoundOffset ;
+      yRotBoundExtension = 2 * xRotBoundOffset ;
+      // console.log( xRotBoundOffset , yRotBoundOffset , xRotBoundExtension , yRotBoundExtension ) ;
+    } else {
+      xRotBoundOffset = yRotBoundOffset = xRotBoundExtension = yRotBoundExtension = 0 ;
+    }
+  } ;
 
   var initHeight = function() {
     var idealX = yWidth * ( xPixWidth / yPixWidth ) ;
@@ -111,20 +115,16 @@ var PLANE = ( function() {
   var toReZ , toImZ ;
   var setPToCArrays = function() {
     var i ;
-    toReZ = new Float64Array( xPixWidth ) ;
-    toImZ = new Float64Array( yPixWidth ) ;
+    toReZ = new Float64Array( xPixWidth + xRotBoundExtension ) ;
+    toImZ = new Float64Array( yPixWidth + yRotBoundExtension ) ;
     // TODO: improve total width detection
-    for( i = 0 ; i < ( xPixWidth ) ; i++ ) { toReZ[i] = xMin + ( deltaX * ( i - xRotBoundOffset ) ) ; }
-    for( i = 0 ; i < ( yPixWidth ) ; i++ ) { toImZ[i] = yMin + ( deltaY * ( i - yRotBoundOffset ) ) ; }
+    for( i = 0 ; i < ( xPixWidth + xRotBoundExtension ) ; i++ ) { toReZ[i] = xMin + ( deltaX * ( i - xRotBoundOffset ) ) ; }
+    for( i = 0 ; i < ( yPixWidth + yRotBoundExtension ) ; i++ ) { toImZ[i] = yMin + ( deltaY * ( i - yRotBoundOffset ) ) ; }
     return this;
   } ;
 
   var getToReZ = function() { return toReZ ; } ;
-  var getToImZ = function( yStart , yEnd ) {
-    yStart = yStart || 0 ;
-    yEnd = yEnd || yPixWidth ;
-    return toImZ.subarray( yStart , yEnd ) ;
-  } ;
+  var getToImZ = function() { return toImZ ; } ;
 
   // // TODO: Polar
   // var toPixMod , toPixPhi ;
@@ -150,20 +150,6 @@ var PLANE = ( function() {
   //     }
   //   }
   //   return this;
-  // } ;
-
-  // // TODO: Polar
-  // var calcRotBoundExtension = function() {
-  //   if( OPT.isPolar() ) {
-  //     var l = xPixWidth / 2 , h = yPixWidth / 2 ;
-  //     var diag = Math.sqrt( l * l + h * h ) ;
-  //     var pinchCorrection = 10 ;
-  //     xRotBoundOffset = yRotBoundOffset = Math.ceil( diag - ( l < h ? l : h ) ) + pinchCorrection ;
-  //     xRotBoundExtension = 2 * xRotBoundOffset ;
-  //     yRotBoundExtension = 2 * xRotBoundOffset ;
-  //   } else {
-  //     xRotBoundOffset = yRotBoundOffset = xRotBoundExtension = yRotBoundExtension = 0 ;
-  //   }
   // } ;
 
   var getTotalPixelNumber = function() {
@@ -203,6 +189,12 @@ var PLANE = ( function() {
     "getToImZ"            : getToImZ ,
     "updateDrawParams"    : updateDrawParams ,
     "getYPixWidth"        : getYPixWidth ,
+    "getXPixWidth"        : getXPixWidth ,
+    "setRotBounds"        : setRotBounds ,
+    "getXRotBoundOffset"  : getXRotBoundOffset ,
+    "getYRotBoundOffset"  : getYRotBoundOffset ,
+    "getExtendedYPixWidth": getExtendedYPixWidth ,
+    "getExtendedXPixWidth": getExtendedXPixWidth ,
   } ;
 
   return API ;

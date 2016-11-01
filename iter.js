@@ -38,14 +38,9 @@ var ITER = ( function() {
 
   var initCalc = function( totalPixels ) {
     resetThreadData() ;
-    //if( OPT.isPolar() ) { initPolarCalc() ; }
+    PLANE.setRotBounds() ;
+    PLANE.setPToCArrays() ;
   } ;
-
-  //var initPolarCalc = function() {
-  //calcRotBoundExtension() ;
-  //populateViewportPolarArrays() ;
-  //return this ;
-  //} ;
 
   var execCalc = function() {
     if( hasWorkers() && isMultiThread() ) { execThreads() ; }
@@ -54,30 +49,29 @@ var ITER = ( function() {
   } ;
 
   var execThreads = function() {
-    var yPixWidth = PLANE.getYPixWidth() ;
+    // var yPixWidth = PLANE.getYPixWidth() ;
+    var yPixWidth = PLANE.getExtendedYPixWidth() ;
     var numThreads = OPT.getNumThreads() ;
     var yPixPerThread = Math.floor( yPixWidth / numThreads ) ;
     var lastThreadDelta = yPixWidth - yPixPerThread * numThreads ;
-    console.log( lastThreadDelta ) ;
+    // console.log( lastThreadDelta ) ;
     var yStart , yEnd , isLastThread ;
     for( var workerID = 0 ; workerID < numThreads  ; workerID++ ) {
       yStart = workerID * yPixPerThread ;
       yEnd = yStart + yPixPerThread ;
       // isLastThread = ( workerID === ( numThreads - 1 ) ) ;
       // if( isLastThread ) { yEnd += lastThreadDelta ; }
-      console.log( yStart , yEnd ) ;
+      // console.log( yStart , yEnd ) ;
       startWorker( workerID , yStart , yEnd ) ;
     }
   } ;
   
   var xRotOffset = function( x , y  , theta ) {
-    // TOOK A WHILE TO GET HERE. RESPECT WINGING TRANSFORMS
-    return x - ( x * Math.cos( theta ) + y * Math.sin( theta ) ) ;
+    return ( x - ( x * Math.cos( theta ) + y * Math.sin( theta ) ) ) ;
   } ;
 
   var yRotOffset = function( x , y , theta ) {
-    // TOOK A WHILE TO GET HERE. RESPECT WINGING TRANSFORMS
-    return y + ( x * Math.sin( theta ) - y * Math.cos( theta ) ) ;
+    return ( y + ( x * Math.sin( theta ) - y * Math.cos( theta ) ) ) ;
   } ;
 
   var startWorker = function( workerID , yStart , yEnd ) {
@@ -85,8 +79,10 @@ var ITER = ( function() {
     // TODO: improve performance timing
     // TODO: stop extra threads when lowering count
     startTimer() ;
-    var xC = PLANE.getToReZ().length ;
-    var yC = PLANE.getToImZ().length ;
+    // var xC = PLANE.getToReZ().length ;
+    // var yC = PLANE.getToImZ().length ;
+    var xC = PLANE.getXPixWidth();
+    var yC = PLANE.getYPixWidth() ;
     $mBrotWorkers[ workerID ].postMessage( {
       "iterVal"            : OPT.getOptionData().iter.value ,
       "maxSq"              : OPT.getMaxSq() ,
@@ -94,10 +90,15 @@ var ITER = ( function() {
       "toImZ"              : PLANE.getToImZ() ,
       "yStart"             : yStart ,
       "yEnd"               : yEnd ,
+      "xWidth"             : xC ,
       "workerID"           : workerID ,
       "isPolar"            : OPT.isPolar() ,
-      "xOriginRotOffset"   : xRotOffset( xC / 2 , yC / 2 , MATH.toRad( OPT.getRot() ) ) ,
-      "yOriginRotOffset"   : yRotOffset( xC / 2 , yC / 2 , MATH.toRad( OPT.getRot() ) ) ,
+      "xOriginRotOffset"   : xRotOffset( xC/2 , yC/2 , MATH.toRad( OPT.getRot() ) ) ,
+      "yOriginRotOffset"   : yRotOffset( xC/2 , yC/2 , MATH.toRad( OPT.getRot() ) ) ,
+      // "xOriginRotOffset"   : xC / 4 ,
+      // "yOriginRotOffset"   : yC / 4 ,
+      "xRotBoundOffset"    : PLANE.getXRotBoundOffset() ,
+      "yRotBoundOffset"    : PLANE.getYRotBoundOffset() ,
       "rotationAngle"      : MATH.toRad( OPT.getRot() )
     } ) ;
   } ;
