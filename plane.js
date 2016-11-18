@@ -20,8 +20,8 @@ var PLANE = ( function() {
     yCenter = yMin + ( yPixCenter / yPixWidth ) * yWidth ;
   } ;
 
-  // var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
-  var xMin = -2 , xMax = 2 , yMin = -1.5 , yMax = 1.5 ;
+  var xMin = -2 , xMax = 1 , yMin = -1.5 , yMax = 1.5 ;
+  // var xMin = -2 , xMax = 2 , yMin = -1.5 , yMax = 1.5 ;
   var xWidth = xMax - xMin ;
   var yWidth = yMax - yMin ;
   var zoomCPlaneBounds = function() {
@@ -127,21 +127,20 @@ var PLANE = ( function() {
     return toImZ.length * toReZ.length ;
   } ;
 
-  var remapPolarClick = function( ev ) {
-    var rotX = OPT.isPolar() ?
-        MATH.rotComplex( [ xPixCenter , yPixCenter ] , MATH.toRad( - OPT.getRot() ) ) :
-        [ xPixCenter , yPixCenter ] ;
-    setXPixCenter( ev.layerX ) ;
-    setYPixCenter( ev.layerY ) ;
-    xPixCenter = rotX[ 0 ] ;
-    yPixCenter = rotX[ 1 ] ;
+  var remapPolarClick = function() {
+    var remappedX = xPixCenter - xPixWidth / 2 ;
+    var remappedY = yPixCenter - yPixWidth / 2 ;
+    var rot = MATH.toRad( OPT.getRot() ) ;
+    var rotX = MATH.rotComplex( [ remappedX , remappedY ] , rot ) ;
+    setXPixCenter( rotX[ 0 ] + xPixWidth / 2 ) ;
+    setYPixCenter( rotX[ 1 ] + yPixWidth / 2 ) ;
   } ;
 
   var updateDrawParams = function( ev ) {
     updateOverallZoomFactor() ;
     setXPixCenter( ev.layerX ) ;
     setYPixCenter( ev.layerY ) ;
-    if( OPT.isPolar() ) { remapPolarClick( ev ) ; }
+    if( OPT.isPolar() ) { remapPolarClick() ; }
     updateCPlaneCenter() ;
     zoomCPlaneBounds() ;
     updateCPlaneWidths() ;
@@ -164,7 +163,7 @@ var PLANE = ( function() {
     "getXRotBoundOffset"  : getXRotBoundOffset ,
     "getYRotBoundOffset"  : getYRotBoundOffset ,
     "getExtendedYPixWidth": getExtendedYPixWidth ,
-    "getExtendedXPixWidth": getExtendedXPixWidth ,
+    "getExtendedXPixWidth": getExtendedXPixWidth
   } ;
 
   return API ;

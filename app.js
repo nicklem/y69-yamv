@@ -13,9 +13,27 @@
 // antialiasing
 // image export
 // mobile styles
-//
 
 var APP = ( function APP() {
+
+  var initControls = function() {
+    CONTROLS.init();
+    CONTROLS.listen() ;
+  } ;
+
+  var initCanvas = function() {
+    CANVAS.init() ;
+  } ;
+  
+  var initOptions = function() {
+    OPT.optFromGET() ;
+    OPT.autoThread() ;
+  } ;
+
+  var updateControls = function() {
+    CONTROLS.createControls() ;
+    CONTROLS.render() ;
+  } ;
 
   var updateOptions = function( ev ) {
     CONTROLS.mapToOptions() ;
@@ -23,14 +41,19 @@ var APP = ( function APP() {
     PLANE.updateDrawParams( ev ) ;
   } ;
 
-  var initControls = function() {
-    CONTROLS.init();
-    CONTROLS.listen() ;
+  var setClickOnCanvas = function( f ) {
+    CANVAS.getCanvas().addEventListener( "click" , f.bind( this ) ) ;
   } ;
   
-  var updateControls = function() {
-    CONTROLS.createControls() ;
-    CONTROLS.render() ;
+  var setPlane = function() {
+    PLANE.setPixWidths( CANVAS.getWidth() , CANVAS.getHeight() ) ;
+    PLANE.setDeltasPerPixel() ;
+    PLANE.setPToCArrays() ;
+  } ;
+  
+  var execCalc = function() {
+    ITER.initCalc() ;
+    ITER.execCalc() ;
   } ;
   
   var logSettings = function() {
@@ -39,34 +62,27 @@ var APP = ( function APP() {
   } ;
   
   var render = function render() {
-    CANVAS.init() ;
-    PLANE.setPixWidths( CANVAS.getWidth() , CANVAS.getHeight() ) ;
-    PLANE.setDeltasPerPixel() ;
-    PLANE.setPToCArrays() ;
-    ITER.initCalc( PLANE.getTotalPixelNumber() ) ;
-    ITER.execCalc() ;
-    return this ;
+    initCanvas() ;
+    setPlane() ;
+    execCalc() ;
   } ;
 
   var listen = function listen() {
-    CANVAS.getCanvas().addEventListener( "click" , function( ev ) {
+    setClickOnCanvas( function( ev ) {
       updateOptions( ev ) ;
-      render() ;
       updateControls() ;
-    }.bind( this ) ) ;
-    return this ;
+      render() ;
+    } ) ;
   } ;
 
   var main = function() {
     logSettings() ;
+    initOptions() ;
     initControls() ;
     render() ;
     listen() ;
     return this ;
   } ;
 
-  return {
-    "main" : main 
-  } ;
-
+  return { "main" : main } ;
 } () ) ;

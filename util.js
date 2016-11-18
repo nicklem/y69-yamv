@@ -11,10 +11,9 @@
 var UTIL = ( function() {
 
   var timeExec = function( f , context ) {
-    const VALUE = 0 , UNIT = 1 ;
-    var c = context || window ;
     var initTime = performance.now();
-    f.bind( c )() ;
+    // f.bind( context || window )() ;
+    f() ;
     var endTime = performance.now();
     return Math.round( endTime - initTime ) + "&nbsp;ms";
   } ;

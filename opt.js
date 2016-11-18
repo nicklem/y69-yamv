@@ -23,8 +23,12 @@ var OPT = ( function() {
     "Blue"     : [   0 ,   0 , 255 ] ,
     "Cyan"     : [   0 , 255 , 255 ] ,
     "Magenta"  : [ 255 ,   0 , 255 ] ,
-    "Yellow"   : [ 255 , 255 ,   0 ] ,
+    "Yellow"   : [ 255 , 255 ,   0 ]
   } ;
+
+  var multiThread = { "One" : 1 , "Two" : 2 , "Four" : 4 , "Eight" : 8 } ;
+      
+  var renderEngines = { "Cartesian" : "Cartesian" , "Polar" : "Polar" } ;
 
   var optionData = {
 
@@ -32,65 +36,65 @@ var OPT = ( function() {
       "value" : 2 ,
       "labelText" : "Max" ,
       "type"  : "text" ,
-      "recalcNeeded": YES ,
+      "recalcNeeded": YES
     } ,
 
     "iter" :  {
       "value" : 25 ,
       "labelText" : "Iterations" ,
       "type"  : "text" ,
-      "recalcNeeded": YES ,
+      "recalcNeeded": YES
     } ,
 
     "deltaIter" : {
       "value" : 0 ,
       "labelText" : "Delta iter" ,
       "type"  : "text" ,
-      "recalcNeeded": NO ,
+      "recalcNeeded": NO
     } ,
 
     "zoom" : {
       "value" : 1 ,
       "labelText" : "Zoom factor" ,
       "type"  : "text" ,
-      "recalcNeeded": NO ,
+      "recalcNeeded": NO
     } ,
 
     "renderEngine" : {
       "value" : "Cartesian" ,
       "labelText" : "Engine" ,
       "type"  : "select" ,
-      "options": { "Cartesian" : "Cartesian" , "Polar" : "Polar" } ,
-      "recalcNeeded": YES ,
+      "options": renderEngines ,
+      "recalcNeeded": YES
     } ,
 
     "rot" : {
       "value" : 0 ,
       "labelText" : "Rotation" ,
       "type"  : "text" ,
-      "recalcNeeded": YES ,
+      "recalcNeeded": YES
     } ,
 
     "multiThread" : {
-      "value" : "Two" ,
+      "value" : "Four" ,
       "labelText" : "Threads" ,
       "type"  : "select" ,
-      "options": { "One" : 1 , "Two" : 2 , "Four" : 4 , "Eight" : 8 } ,
-      "recalcNeeded": NO ,
+      "options": multiThread ,
+      "recalcNeeded": NO
     } ,
 
     "brightness" : {
       "value" : 1 ,
       "labelText" : "Brightness" ,
       "type"  : "text" ,
-      "recalcNeeded": NO ,
+      "recalcNeeded": NO
     } ,
 
     "haloDecay" : {
       "value" : 7 ,
       "labelText" : "Halo decay" ,
       "type"  : "text" ,
-      "recalcNeeded": NO ,
+      "recalcNeeded": NO
     } ,
 
     "innerColor" : {
@@ -98,7 +102,7 @@ var OPT = ( function() {
       "labelText" : "Inner color" ,
       "type"  : "select" ,
       "options": colors ,
-      "recalcNeeded": NO ,
+      "recalcNeeded": NO
     } ,
 
     "rimColor" : {
@@ -106,7 +110,7 @@ var OPT = ( function() {
       "labelText" : "Rim color" ,
       "type"  : "select" ,
       "options": colors ,
-      "recalcNeeded": NO ,
+      "recalcNeeded": NO
     } ,
 
     "haloColor" : {
@@ -114,7 +118,7 @@ var OPT = ( function() {
       "labelText" : "Halo color" ,
       "type"  : "select" ,
       "options": colors ,
-      "recalcNeeded": NO ,
+      "recalcNeeded": NO
     } ,
 
     "outerColor" : {
@@ -122,16 +126,55 @@ var OPT = ( function() {
       "labelText" : "Outer color" ,
       "type"  : "select" ,
       "options": colors ,
-      "recalcNeeded": NO ,
+      "recalcNeeded": NO
     } ,
 
-  } ;
+    // "getAllOptions" : function() {
+    //   var o = {} ;
+    //   for( var el in this ) {
+    //     if( this.hasOwnProperty( el ) && typeof this[ el ] === "object" ) {
+    //       o[ el ] = {} ;
+    //       o[ el ][ "value" ] = this[ el ].value ;
+    //       if( !! this[ el ].options ) {
+    //         o[ el ][ "options" ] = this[ el ].options ;
+    //       }
+    //     }
+    //   }
+    //   console.log( o ) ;
+    //   return o ;
+    // }
 
+  } ;
+  
   var getOptionData = function() { return optionData ; } ;
+  // TODO: temporary solution. Needs proper setters w input checking
   var setOption = function( opt , val ) { 
     if( typeof( optionData[ opt ].value ) !== "undefined") {
       optionData[ opt ].value =  val ; 
-    } else throw new Error( "Setting non-existent option" ) ;
+    } else throw new Error( { "message" : "Setting non-existent option" } ) ;
+  } ;
+
+  var optFromGET = function() {
+    var res = {}, tmp = [] , hasTrailingSlash = false ;
+    location.search.substr( 1 )
+        .split( "&" )
+        .forEach( function( item ) {
+          tmp = item.split( "=" ) ;
+          tmp[ 1 ] = decodeURIComponent( tmp[ 1 ] ) ;
+          hasTrailingSlash = !! tmp[ 1 ].match(/\/$/) ;
+          if( hasTrailingSlash ) {
+            tmp[ 1 ] = tmp[ 1 ].substring( 0 , tmp[ 1 ].length - 1 ) ;
+          }
+          res[ tmp[ 0 ] ] = { "value" : tmp[ 1 ] } ;
+        } ) ;
+    // console.log( optionData.getAllOptions() ) ;
+  } ;
+  
+  var autoThread = function() {
+    if( !! navigator.hardwareConcurrency ) {
+      // optionData.multiThread.value = navigator.hardwareConcurrency ;
+      // console.log( optionData.multiThread.options.indexOf ) ;
+    }
   } ;
 
   var getColors = function() {
@@ -164,6 +207,8 @@ var OPT = ( function() {
     "getHaloColor"      : getHaloColor ,
     "getOuterColor"     : getOuterColor ,
     "updateIterOnClick" : updateIterOnClick ,
+    "optFromGET"        : optFromGET ,
+    "autoThread"        : autoThread
   } ;
 
 } () ) ; // END opt

@@ -36,7 +36,7 @@ var ITER = ( function() {
   var allThreadsDone = function() { return threadsDone === OPT.getOptionData().multiThread.options[ OPT.getOptionData().multiThread.value ] ; } ;
   var resetThreadDone = function() { threadsDone = 0 ; } ;
 
-  var initCalc = function( totalPixels ) {
+  var initCalc = function() {
     resetThreadData() ;
     PLANE.setRotBounds() ;
     PLANE.setPToCArrays() ;
@@ -49,11 +49,10 @@ var ITER = ( function() {
   } ;
 
   var execThreads = function() {
-    // var yPixWidth = PLANE.getYPixWidth() ;
-    var yPixWidth = PLANE.getExtendedYPixWidth() ;
+    var yPixWidth = PLANE.getYPixWidth() ;
     var numThreads = OPT.getNumThreads() ;
     var yPixPerThread = Math.floor( yPixWidth / numThreads ) ;
-    var lastThreadDelta = yPixWidth - yPixPerThread * numThreads ;
+    // var lastThreadDelta = yPixWidth - yPixPerThread * numThreads ;
     // console.log( lastThreadDelta ) ;
     var yStart , yEnd , isLastThread ;
     for( var workerID = 0 ; workerID < numThreads  ; workerID++ ) {
@@ -78,18 +77,18 @@ var ITER = ( function() {
     $mBrotWorkers[ workerID ].postMessage( {
       "iterVal"            : OPT.getOptionData().iter.value ,
       "maxSq"              : OPT.getMaxSq() ,
+      "rotationAngle"      : MATH.toRad( OPT.getRot() ) ,
       "toReZ"              : PLANE.getToReZ() ,
       "toImZ"              : PLANE.getToImZ() ,
+      "xRotBoundOffset"    : PLANE.getXRotBoundOffset() ,
+      "yRotBoundOffset"    : PLANE.getYRotBoundOffset() ,
+      "xOriginRotOffset"   : MATH.xRotOffset( xC/2 , yC/2 , MATH.toRad( OPT.getRot() ) ) ,
+      "yOriginRotOffset"   : MATH.yRotOffset( xC/2 , yC/2 , MATH.toRad( OPT.getRot() ) ) ,
       "yStart"             : yStart ,
       "yEnd"               : yEnd ,
       "xWidth"             : xC ,
       "workerID"           : workerID ,
       "isPolar"            : OPT.isPolar() ,
-      "xOriginRotOffset"   : MATH.xRotOffset( xC/2 , yC/2 , MATH.toRad( OPT.getRot() ) ) ,
-      "yOriginRotOffset"   : MATH.yRotOffset( xC/2 , yC/2 , MATH.toRad( OPT.getRot() ) ) ,
-      "xRotBoundOffset"    : PLANE.getXRotBoundOffset() ,
-      "yRotBoundOffset"    : PLANE.getYRotBoundOffset() ,
-      "rotationAngle"      : MATH.toRad( OPT.getRot() )
     } ) ;
   } ;
 
@@ -127,7 +126,7 @@ var ITER = ( function() {
     "maxThreads"              : maxThreads ,
     "initCalc"                : initCalc ,
     "execCalc"                : execCalc ,
-    "getThreadData"           : getThreadData ,
+    "getThreadData"           : getThreadData 
   } ;
 
   return API ;

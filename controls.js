@@ -13,7 +13,11 @@ var CONTROLS = ( function() {
   var form ;
   var optionDisplay ;
   var controls = [] ;
-  var recalcOnSubmit = false ;
+  
+  var recalcOnSubmit = 0 ;
+  var resetRecalcOnSubmit = function() { recalcOnSubmit = 0 ; } ;
+  var shouldRecalcOnSubmit = function() { return recalcOnSubmit !== 0 ; } ;
+  var updateRecalcOnSubmit = function( plusOne ) { recalcOnSubmit += plusOne ; } ;
 
   var init = function() {
     if( typeof form === "undefined" ) form = document.querySelector( "#ctrl" ) ;
@@ -38,6 +42,7 @@ var CONTROLS = ( function() {
           var inputElement = document.createElement( "select" ) ;
           var dropDownOpts = currentOptions[ option ].options ;
           var curOption = currentOptions[ option ].value ;
+            // console.log( dropDownOpts ) ;
           inputElement.setAttribute( "name" , option ) ;
           for( var dropDownO in dropDownOpts ) {
             var curOpt = document.createElement( "option" ) ;
@@ -60,13 +65,13 @@ var CONTROLS = ( function() {
       label.appendChild( txt ) ;
       container.appendChild( label ) ;
 
-      if( currentOptions[ option ].devStatus ) {
-        var devStatus = document.createElement( "div" ) ;
-        var devStatusTxt = document.createTextNode( currentOptions[ option ].devStatus ) ;
-        devStatus.setAttribute( "class" , "control-input dev-status " + currentOptions[ option ].devStatus ) ;
-        devStatus.appendChild( devStatusTxt ) ;
-        container.appendChild( devStatus ) ;
-      }
+      // if( currentOptions[ option ].devStatus ) {
+      //   var devStatus = document.createElement( "div" ) ;
+      //   var devStatusTxt = document.createTextNode( currentOptions[ option ].devStatus ) ;
+      //   devStatus.setAttribute( "class" , "control-input dev-status " + currentOptions[ option ].devStatus ) ;
+      //   devStatus.appendChild( devStatusTxt ) ;
+      //   container.appendChild( devStatus ) ;
+      // }
 
       controls.push( container ) ;
     }
@@ -81,8 +86,8 @@ var CONTROLS = ( function() {
         var curOpt = form.elements[ option ].value ;
         curOpt = isNaN( parseFloat( curOpt ) ) ? curOpt : parseFloat( curOpt ) ;
         if( currentOptions[ option ].value !== curOpt ) {
-          console.log( option , curOpt ) ;
-          recalcOnSubmit += currentOptions[ option ].recalcNeeded ;
+          // console.log( option , curOpt ) ;
+          updateRecalcOnSubmit( currentOptions[ option ].recalcNeeded ) ;
           OPT.setOption( option , curOpt ) ;
         }
       }
@@ -93,9 +98,9 @@ var CONTROLS = ( function() {
   var listen = function() {
     form.addEventListener( "submit" , function( ev ) {
       ev.preventDefault() ;
-      recalcOnSubmit = 0 ;
+      resetRecalcOnSubmit() ;
       mapToOptions() ;
-      if( recalcOnSubmit !== 0 ) {
+      if( shouldRecalcOnSubmit() ) {
         ITER.initCalc() ;
         ITER.execCalc() ;
       } else {
