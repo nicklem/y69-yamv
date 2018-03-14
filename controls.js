@@ -62,14 +62,6 @@ var CONTROLS = ( function() {
       label.appendChild( txt ) ;
       container.appendChild( label ) ;
 
-      // if( currentOptions[ option ].devStatus ) {
-      //   var devStatus = document.createElement( "div" ) ;
-      //   var devStatusTxt = document.createTextNode( currentOptions[ option ].devStatus ) ;
-      //   devStatus.setAttribute( "class" , "control-input dev-status " + currentOptions[ option ].devStatus ) ;
-      //   devStatus.appendChild( devStatusTxt ) ;
-      //   container.appendChild( devStatus ) ;
-      // }
-
       controls.push( container ) ;
     }
     return this ;

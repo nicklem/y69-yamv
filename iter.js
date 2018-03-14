@@ -41,8 +41,7 @@ var ITER = ( function() {
   } ;
 
   var execCalc = function() {
-    if( hasWorkers() && isMultiThread() ) { execThreads() ; }
-    else { singleThreadCalc() ; }
+    execThreads() ;
     return this ;
   } ;
 
@@ -50,15 +49,10 @@ var ITER = ( function() {
     var yPixWidth = PLANE.getYPixWidth() ;
     var numThreads = OPT.getNumThreads() ;
     var yPixPerThread = Math.floor( yPixWidth / numThreads ) ;
-    // var lastThreadDelta = yPixWidth - yPixPerThread * numThreads ;
-    // console.log( lastThreadDelta ) ;
     var yStart , yEnd , isLastThread ;
     for( var workerID = 0 ; workerID < numThreads  ; workerID++ ) {
       yStart = workerID * yPixPerThread ;
       yEnd = yStart + yPixPerThread ;
-      // isLastThread = ( workerID === ( numThreads - 1 ) ) ;
-      // if( isLastThread ) { yEnd += lastThreadDelta ; }
-      // console.log( yStart , yEnd ) ;
       startWorker( workerID , yStart , yEnd ) ;
     }
   } ;
@@ -68,8 +62,6 @@ var ITER = ( function() {
     // TODO: improve performance timing
     // TODO: stop extra threads when lowering count
     startTimer() ;
-    // var xC = PLANE.getToReZ().length ;
-    // var yC = PLANE.getToImZ().length ;
     var xC = PLANE.getXPixWidth();
     var yC = PLANE.getYPixWidth() ;
     $mBrotWorkers[ workerID ].postMessage( {
@@ -90,22 +82,6 @@ var ITER = ( function() {
     } ) ;
   } ;
 
-  var iterCalc = function() {
-    var iv = OPT.getOptionData().iter.value ;
-    var re = PLANE.getToReZ() , xw = re.length ;
-    var im = PLANE.getToImZ() , yw = im.length ;
-    var ms = OPT.getMaxSq() ;
-    // MANDELBROT ALGO
-    var i = 1 , p = 0 , x = 0 , y , r2 = 0 , i2 = 0 , c = [ 0 , 0 ] , z;
-    for(y=0;y<yw;y=y+1){for(x=0;x<xw;x=x+1){z=[0,0];p=x+xw*y;c=[x,y];for(i=1;i<=iv;i=i+1){r2=z[0]*z[0];i2=z[1]*z[1];z=[r2-i2+re[c[0]],2*z[0]*z[1]+im[c[1]]];if(r2+i2>ms){mThreadData[0][p]=i;break;}}if(i>iv)mThreadData[0][p]=iv;}}
-  } ;
-  
-  var singleThreadCalc = function() {
-    // TODO: improve performance timing
-    startTimer() ;
-    iterCalc() ;
-    redrawAndReset() ;
-  } ;
   var redrawAndReset = function() {
     CANVAS.redraw() ;
     UTIL.consoleLog( OPT.getNumThreads() + "T/x" + PLANE.getOverallZoom().toPrecision( 3 ) , Math.round( performance.now() - window.$mBrotPerfStart ) + " ms" ) ;

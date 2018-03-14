@@ -150,7 +150,6 @@ var PLANE = ( function() {
     "setPixWidths"        : setPixWidths ,
     "setDeltasPerPixel"   : setDeltasPerPixel ,
     "getOverallZoom"      : getOverallZoom ,
-    //"setCPlaneBounds"     : setCPlaneBounds ,
     "getTotalPixelNumber" : getTotalPixelNumber ,
     "getToReZ"            : getToReZ ,
     "getToImZ"            : getToImZ ,
