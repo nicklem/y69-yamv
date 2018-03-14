@@ -60,13 +60,13 @@ var OPT = ( function() {
       "recalcNeeded": NO
     } ,
 
-    "renderEngine" : {
-      "value" : "Cartesian" ,
-      "labelText" : "Engine" ,
-      "type"  : "select" ,
-      "options": renderEngines ,
-      "recalcNeeded": YES
-    } ,
+    // "renderEngine" : {
+    //   "value" : "Cartesian" ,
+    //   "labelText" : "Engine" ,
+    //   "type"  : "select" ,
+    //   "options": renderEngines ,
+    //   "recalcNeeded": YES
+    // } ,
 
     "rot" : {
       "value" : 0 ,
@@ -167,7 +167,6 @@ var OPT = ( function() {
           }
           res[ tmp[ 0 ] ] = { "value" : tmp[ 1 ] } ;
         } ) ;
-    // console.log( optionData.getAllOptions() ) ;
   } ;
   
   var autoThread = function() {
@@ -189,11 +188,12 @@ var OPT = ( function() {
   var getMaxSq = function() { return optionData.max.value * optionData.max.value } ;
   var getZoom = function() { return optionData.zoom.value } ;
   var getRot = function() { return optionData.rot.value } ;
-  var isPolar = function() { return optionData.renderEngine.value === "Polar" } ;
+  // var isPolar = function() { return optionData.renderEngine.value === "Polar" } ;
+  var isPolar = function() { return true } ;
   var updateIterOnClick = function() { optionData.iter.value += optionData.deltaIter.value ; } ;
   var getNumThreads = function() { return optionData.multiThread.options[ optionData.multiThread.value ]; } ;
 
-  return {
+  var API = {
     "getOptionData"     : getOptionData ,
     "setOption"         : setOption ,
     "getColors"         : getColors ,
@@ -211,4 +211,5 @@ var OPT = ( function() {
     "autoThread"        : autoThread
   } ;
 
+  return API ;
 } () ) ; // END opt

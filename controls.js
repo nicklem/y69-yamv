@@ -42,7 +42,6 @@ var CONTROLS = ( function() {
           var inputElement = document.createElement( "select" ) ;
           var dropDownOpts = currentOptions[ option ].options ;
           var curOption = currentOptions[ option ].value ;
-            // console.log( dropDownOpts ) ;
           inputElement.setAttribute( "name" , option ) ;
           for( var dropDownO in dropDownOpts ) {
             var curOpt = document.createElement( "option" ) ;
