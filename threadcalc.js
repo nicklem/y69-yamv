@@ -1,3 +1,11 @@
+/*
+ ************************
+ ** By                 **
+ ** Nicola Klemenc     **
+ ** github.com/nicklem **
+ ************************
+ */
+
 onmessage = function( workerData ) {
   var d = workerData.data ;
   var id = typeof id === "undefined" ? d[ "workerID" ] : id ;

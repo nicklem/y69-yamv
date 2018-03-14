@@ -3,8 +3,6 @@
  ** By                 **
  ** Nicola Klemenc     **
  ** github.com/nicklem **
- ** http://y69.tech    **
- ** nick@y69.tech      **
  ************************
  */
 
